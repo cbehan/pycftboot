@@ -1,16 +1,15 @@
 #!/usr/bin/env python2
-from sympy import *
-import time
+
+# Use regular sympy sparingly because it is slow
+# Every time we explicitly use it, we should consider implementing such a line in C++
+from csympy import *
+from csympy.lib.csympy_wrapper import *
+import sympy
 
 z_norm = symbols('z_norm')
 z_conj = symbols('z_conj')
 delta  = symbols('delta')
-
-def damped_rational(const, poles, base, delta):
-    product = 1
-    for p in poles:
-        product *= delta - p
-    return const * (base ** delta) / product
+delta_ext = symbols('delta_ext')
 
 def delta_pole(nu, k, l, series):
     if series == 1:
@@ -27,14 +26,14 @@ def delta_residue(nu, k, l, series):
 	    # Take l to 0, then nu
 	    return ret * 2
 	else:
-	    return ret * (rf(l + 2 * nu, 2 * k) / rf(l + nu, 2 * k))
+	    return ret * (sympy.rf(l + 2 * nu, 2 * k) / sympy.rf(l + nu, 2 * k))
     elif series == 2:
-	return - rf(nu, k) * rf(1 - nu, k) * (rf((nu + l + 1 - k) / 2, k) ** 2 / rf((nu + l - k) / 2, k) ** 2) * (k / factorial(k) ** 2) * ((nu + l - k) / (nu + l + k))
+	return - sympy.rf(nu, k) * sympy.rf(1 - nu, k) * (sympy.rf((nu + l + 1 - k) / 2, k) ** 2 / sympy.rf((nu + l - k) / 2, k) ** 2) * (k / factorial(k) ** 2) * ((nu + l - k) / (nu + l + k))
     else:
-	return - (rf(1 + l - 2 * k, 2 * k) / rf(1 + nu + l - 2 * k, 2 * k)) * ((k * factorial(2 * k) ** 2) / (2 ** (4 * k - 1) * factorial(k) ** 4))
+	return - (sympy.rf(1 + l - 2 * k, 2 * k) / sympy.rf(1 + nu + l - 2 * k, 2 * k)) * ((k * factorial(2 * k) ** 2) / (2 ** (4 * k - 1) * factorial(k) ** 4))
 
 def get_poles(dim, l, kept_pole_order):
-    nu = Rational(dim, 2) - 1
+    nu = sympy.Rational(dim, 2) - 1
 
     k = 1
     ret = []
@@ -70,14 +69,14 @@ def omit_product(poles, special_pole):
 
 def leading_block(nu, r, eta, l):
     if nu == 0:
-	ret = chebyshevt(l, eta)
+        ret = sympy.chebyshevt(l, eta)
     else:
-        ret = factorial(l) * gegenbauer(l, nu, eta) / rf(2 * nu, l)
+        ret = factorial(l) * sympy.gegenbauer(l, nu, eta) / sympy.rf(2 * nu, l)
     return ret / (((1 - r ** 2) ** nu) * sqrt((1 + r ** 2) ** 2 - 4 * (r * eta) ** 2))
 
 def meromorphic_block(dim, r, eta, Delta, l_new, l, kept_pole_order, top):
     k = 1
-    nu = Rational(dim, 2) - 1
+    nu = sympy.Rational(dim, 2) - 1
     # When the recursion relation shifts l, this does not affect the appropriate poles and
     # residues to use which are still determined by the original spin.
     summation = leading_block(nu, r, eta, l_new)
@@ -144,100 +143,85 @@ class ConformalBlockTable:
 	    step = 2
 	
 	z = symbols('z')
-	rho_n = Function('rho_n')
-	rho_c = Function('rho_c')
+	rho_n = function_symbol('rho_n', z_norm)
+	rho_c = function_symbol('rho_c', z_conj)
 	rho = z / (1 + sqrt(1 - z)) ** 2
 	
 	rules = []
 	for i in range(0, derivative_order + 1):
-	    rules.append(diff(rho, z, i).subs(z, 0.5))
-
-	# This should be modified for when we need even_derivatives
+	    rules.append(rho.subs(z, 0.5))
+	    rho = rho.diff(z)
+	
+	# We cache derivatives as we go
+	# This is because csympy can only compute them one at a time, but it's faster anyway
 	for l in range(0, l_max + 1, step):
 	    derivatives = []
+	    expressions = []
+	    
+	    # Multiplying a list twice is weird in Python
+	    # If this were a numpy array, it would have to store floats
+	    for i in range(0, derivative_order + 1):
+	        expressions.append([0] * (derivative_order + 1))
+	    
+	    expressions[0][0] = conformal_block(dim, rho_n, rho_c, delta, l, kept_pole_order)
 	    for m in range(0, derivative_order + 1):
-		for n in range(1 - (m % 2), min(m, derivative_order + 1 - m), 2):
-		    expression = diff(conformal_block(dim, rho_n(z_norm), rho_c(z_conj), delta, l, kept_pole_order), z_norm, m, z_conj, n).subs((rho_n(z_norm) * rho_c(z_conj)) ** (delta / 2), 1)
-		    for i in range(m, -1, -1):
-		        expression = expression.subs(Derivative(rho_n(z_norm), z_norm, i), rules[i])
-		    for j in range(n, -1, -1):
-		        expression = expression.subs(Derivative(rho_c(z_conj), z_conj, j), rules[j])
+		for n in range(0, min(m, derivative_order - m) + 1):
+		    if n == 0 and m != 0:
+		        expressions[m][0] = expressions[m - 1][0].diff(z_norm)
+		    elif n > 0:
+		        expressions[m][n] = expressions[m][n - 1].diff(z_conj)
 		    
-		    # We loop backwards because high derivatives depend on low derivatives
-		    # Using replace above instead of subs would be slow
-		    derivatives.append(expand(expression))
+		    # We need to expand before we evaluate to have the essential singularity cancel
+		    deriv = expressions[m][n] * (sqrt(rho_n * rho_c) ** (-delta))
+		    deriv = deriv.expand()
+		    
+		    for i in range(m, 0, -1):
+		        deriv = deriv.subs(Derivative(rho_n, [z_norm] * i), rules[i])
+		    for j in range(n, 0, -1):
+		        deriv = deriv.subs(Derivative(rho_c, [z_conj] * j), rules[j])
+		    deriv = deriv.subs(rho_n, rules[0]).subs(rho_c, rules[0])
+		    
+		    derivatives.append(deriv)
 		    # For the 27th element of the list, say what m derivative and what n derivative it corresponds to
 		    if l == 0:
 		        self.m_order.append(m)
 		        self.n_order.append(n)
 	    self.table.append(derivatives)
-    
-    def get_poles(self, l):
-	nu = Rational(self.dim, 2) - 1
-	
-	k = 1
-	ret = []
-	while (2 * k) <= self.kept_pole_order:
-	    if delta_residue(nu, k, l, 1) != 0:
-	        ret.append(delta_pole(nu, k, l, 1))
-	    
-	    if k < nu + l or self.dim % 2 == 1:
-	        if delta_residue(nu, k, l, 2) != 0:
-	            ret.append(delta_pole(nu, k, l, 2))
-	    
-	    if k <= (l / 2):
-	        if delta_residue(nu, k, l, 3) != 0:
-	            ret.append(delta_pole(nu, k, l, 3))
-	    
-	    k += 1
-	
-	# This probably won't change anything
-	if nu == 0 and l == 0:
-	    ret.append(-1)
-	
-	return ret
 
-class SDP:
-    def __init__(self, delta_ext, block_table):
+class ConvolvedBlockTable:
+    def __init__(self, block_table):
         # Copying everything but the unconvolved table is fine from a memory standpoint
         self.dim = block_table.dim
 	self.derivative_order = block_table.derivative_order
 	self.kept_pole_order = block_table.kept_pole_order
 	self.l_max = block_table.l_max
 	self.odd_spins = block_table.odd_spins
-	
-        self.unitop = 1
-	self.bounds = []
 	self.table = []
-	self.prefactors = []
 	
-	if block_table.odd_spins:
-	    step = 1
-	else:
-	    step = 2
+	g = function_symbol('g', z_norm, z_conj)
+	f = (((1 - z_norm) * (1 - z_conj)) ** delta_ext) * g
 	
-	# Sets up the unitarity bounds
-	for l in range(0, block_table.l_max + 1, step):
-	    if l == 0:
-	        self.bounds.append(Rational(block_table.dim, 2) - 1)
-	    else:
-	        self.bounds.append(block_table.dim + l - 2)
-	
-	g = Function('g')
-	f = (((1 - z_norm) * (1 - z_conj)) ** delta_ext) * g(z_norm, z_conj)
-	
-	for l in range(0, block_table.l_max + 1, step):
+	# Same comments apply here
+	for l in range(0, len(block_table.table)):
 	    derivatives = []
+	    expressions = []
+	    
+	    for i in range(0, block_table.derivative_order + 1):
+	        expressions.append([0] * (block_table.derivative_order + 1))
+	    
+	    expressions[0][0] = f
 	    for m in range(0, block_table.derivative_order + 1):
-		for n in range(1 - (m % 2), min(m, block_table.derivative_order + 1 - m, 2)):
-		    expression = (1 / (factorial(m) * factorial(n))) * diff(f, z_norm, m, z_conj, n)
+		for n in range(0, min(m, block_table.derivative_order - m) + 1):
+		    if n == 0 and m != 0:
+		        expressions[m][0] = expressions[m - 1][0].diff(z_norm)
+		    elif n > 0:
+		        expressions[m][n] = expressions[m][n - 1].diff(z_conj)
+		    
 		    # Now we replace abstract derivatives with the expressions in the unconvolved table
-		    for i in range(0, len(block_table.table[0])):
-			    expression = expression.replace(Derivative(g(z_norm, z_conj), z_norm, block_table.m_order[i], z_conj, block_table.n_order[i]), block_table.table[l][i])
-		    # Putting subs inside evalf appears not to work. Instead we set the precision after subs.
-		    derivatives.append(expression.subs([(z_norm, 0.5), (z_conj, 0.5)]))
+		    deriv = expressions[m][n] / (factorial(m) * factorial(n))
+		    for i in range(len(block_table.table[0]) - 1, 0, -1):
+		        deriv = deriv.subs(Derivative(g, [z_norm] * block_table.m_order[i] + [z_conj] * block_table.n_order[i]), block_table.table[l][i])
+		    
+		    deriv = deriv.subs(g, block_table.table[l][0])
+		    derivatives.append(deriv.subs({z_norm : 0.5, z_conj : 0.5}))
 	    self.table.append(derivatives)
-	
-	# Separate each element into a polynomial and a prefactor
-	for l in range(0, block_table.l_max + 1, step):
-	    self.prefactors.append(damped_rational(1, block_table.get_poles(l), 3 - 2 * sqrt(2), delta))
