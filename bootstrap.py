@@ -27,10 +27,10 @@ def get_index(array, element):
         return -1
 
 def shifted_prefactor(poles, base, x, shift):
-    product = 1
+    product = mpmath.mpf(1)
     for p in poles:
         product *= x - (p - shift)
-    return (base ** x) / product
+    return (base ** (x + shift)) / product
 
 def delta_pole(nu, k, l, series):
     if series == 1:
@@ -296,14 +296,15 @@ class ConvolvedBlockTable:
 		    deriv = expression / (factorial(m) * factorial(n))
 		    for i in range(len(block_table.table[0]) - 1, 0, -1):
 		        deriv = deriv.subs(Derivative(g, [z_norm] * block_table.m_order[i] + [z_conj] * block_table.n_order[i]), block_table.table[l][i])
-		    
 		    deriv = deriv.subs(g, block_table.table[l][0])
 		    derivatives.append(2 * deriv.subs({z_norm : 0.5, z_conj : 0.5}))
 		    
 		    # Do this once for the unit operator too
 		    if l == 0:
 		        deriv = expression / (factorial(m) * factorial(n))
-			deriv = deriv.subs(Derivative(g, [z_norm]), 0).subs(Derivative(g, [z_conj]), 0).subs(g, 1)
+			for i in range(len(block_table.table[0]) - 1, 0, -1):
+		            deriv = deriv.subs(Derivative(g, [z_norm] * block_table.m_order[i] + [z_conj] * block_table.n_order[i]), 0)
+			deriv = deriv.subs(g, 1)
 			self.norm.append(2 * deriv.subs({z_norm : 0.5, z_conj : 0.5}))
 	    self.table.append(derivatives)
 
@@ -327,7 +328,7 @@ class SDP:
 	        derivatives.append(conv_block_table.table[l][i].subs(delta_ext, dim_ext))
 		if l == 0:
 		    unit = conv_block_table.norm[i].subs(delta_ext, dim_ext)
-		    if unit > max_unit:
+		    if abs(unit) > abs(max_unit):
 		        max_unit = unit
 			max_index = i
 		    self.norm.append(unit)
@@ -358,32 +359,32 @@ class SDP:
 	return ret
     
     def integrand(self, x, pos, shift, poles):
-        return (rho_cross ** shift) * (x ** pos) * shifted_prefactor(poles, rho_cross, x, shift)
+        return (x ** pos) * shifted_prefactor(poles, rho_cross, x, shift)
     
     def integral(self, pos, shift, poles):
         single_poles = []
 	double_poles = []
-	ret = 0
+	ret = mpmath.mpf(0)
 	
 	for p in poles:
 	    if (p - shift) in single_poles:
 	        single_poles.remove(p - shift)
 		double_poles.append(p - shift)
-	    else:
+	    elif (p - shift) < 0:
 	        single_poles.append(p - shift)
 	
 	for i in range(0, len(single_poles)):
-	    denom = 1
+	    denom = mpmath.mpf(1)
 	    pole = single_poles[i]
 	    other_single_poles = single_poles[:i] + single_poles[i + 1:]
 	    for p in other_single_poles:
 	        denom *= pole - p
 	    for p in double_poles:
 	        denom *= (pole - p) ** 2
-	    ret += (1.0 / denom) * (rho_cross ** pole) * ((-pole) ** pos) * mpmath.factorial(pos) * mpmath.gammainc(-pos, a = pole * mpmath.log(rho_cross))
+	    ret += (mpmath.mpf(1) / denom) * (rho_cross ** pole) * ((-pole) ** pos) * mpmath.factorial(pos) * mpmath.gammainc(-pos, a = pole * mpmath.log(rho_cross))
 	
 	for i in range(0, len(double_poles)):
-	    denom = 1
+	    denom = mpmath.mpf(1)
 	    pole = double_poles[i]
 	    other_double_poles = double_poles[:i] + double_poles[i + 1:]
 	    for p in other_double_poles:
@@ -391,14 +392,14 @@ class SDP:
 	    for p in single_poles:
 	        denom *= pole - p
 	    # Contribution of the most divergent part
-	    ret += (1.0 / (pole * denom)) * ((-1) ** (pos + 1)) * mpmath.factorial(pos) * ((mpmath.log(rho_cross)) ** (-pos))
-	    ret -= (1.0 / denom) * (rho_cross ** pole) * ((-pole) ** (pos - 1)) * mpmath.factorial(pos) * mpmath.gammainc(-pos, a = pole * mpmath.log(rho_cross)) * (pos + pole * mpmath.log(rho_cross))
+	    ret += (mpmath.mpf(1) / (pole * denom)) * ((-1) ** (pos + 1)) * mpmath.factorial(pos) * ((mpmath.log(rho_cross)) ** (-pos))
+	    ret -= (mpmath.mpf(1) / denom) * (rho_cross ** pole) * ((-pole) ** (pos - 1)) * mpmath.factorial(pos) * mpmath.gammainc(-pos, a = pole * mpmath.log(rho_cross)) * (pos + pole * mpmath.log(rho_cross))
 	    
 	    factor = 0
 	    for p in other_double_poles:
-	        factor -= 2.0 / (pole - p)
+	        factor -= mpmath.mpf(2) / (pole - p)
 	    for p in single_poles:
-	        factor -= 1.0 / (pole - p)
+	        factor -= mpmath.mpf(1) / (pole - p)
 	    # Contribution of the least divergent part
 	    ret += (factor / denom) * (rho_cross ** pole) * ((-pole) ** pos) * mpmath.factorial(pos) * mpmath.gammainc(-pos, a = pole * mpmath.log(rho_cross))
 	
@@ -467,6 +468,10 @@ class SDP:
 		vector_node.appendChild(polynomial_node)
 	    elements_node.appendChild(vector_node)
 	    
+	    # We have now finished using delta_min in csympy
+	    # It's time to convert it to a more precise mpmath type for this part
+	    delta_min = mpmath.mpf(delta_min.__str__())
+	    
 	    print "Getting points"
 	    poles = get_poles(self.dim, spin, self.kept_pole_order)
 	    index = get_index(laguerre_degrees, degree)
@@ -504,10 +509,10 @@ class SDP:
 		    new_entries.append(bands[r + s])
 		matrix.append(new_entries)
 	    matrix = mpmath.matrix(matrix)
-	    print "Decomposing matrix of size " + str(degree / 2)
-	    #matrix = mpmath.cholesky(matrix)
+	    print "Decomposing matrix of size " + str(degree) + " / 2"
+	    matrix = mpmath.cholesky(matrix, tol = mpmath.mpf(1e-200))
 	    print "Inverting matrix"
-	    #matrix = mpmath.inverse(matrix)
+	    matrix = mpmath.inverse(matrix)
 	    
 	    for d in range(0, (degree / 2) + 1):
 		polynomial_node = doc.createElement("polynomial")
