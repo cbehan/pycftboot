@@ -18,6 +18,7 @@ delta  = symbols('delta')
 delta_ext = symbols('delta_ext')
 fudge = symbols('fudge')
 rho_cross = 3 - 2 * mpmath.sqrt(2)
+dual_poles = []
 
 def get_index(array, element):
     if element in array:
@@ -61,9 +62,9 @@ def get_poles(dim, l, kept_pole_order):
         if delta_residue(nu, k, l, 1) != 0:
 	    ret.append(delta_pole(nu, k, l, 1))
 	    
-	if k < nu + l or dim % 2 != 0:
-	    if delta_residue(nu, k, l, 2) != 0:
-	        ret.append(delta_pole(nu, k, l, 2))
+	# Nonzero but it might be infinite
+	if delta_residue(nu, k, l, 2) != 0:
+	    ret.append(delta_pole(nu, k, l, 2))
 	    
 	if k <= (l / 2):
 	    if delta_residue(nu, k, l, 3) != 0:
@@ -71,20 +72,33 @@ def get_poles(dim, l, kept_pole_order):
 
 	k += 1
 
-    # This probably won't change anything
-    if nu == 0 and l == 0:
-        ret.append(-1)
-        #ret.append(sympy.Rational(-13, 10))
+    return ret
+
+def nice_poles(dim, l, kept_pole_order):
+    nu = sympy.Rational(dim, 2) - 1
+
+    k = 1
+    ret = []
+    while (2 * k) <= kept_pole_order:
+        if delta_residue(nu, k, l, 1) != 0:
+	    ret.append(sympy.Rational(delta_pole(nu, k, l, 1), 1).evalf())
+	    
+	# Nonzero but it might be infinite
+	if delta_residue(nu, k, l, 2) != 0:
+	    ret.append(sympy.Rational(delta_pole(nu, k, l, 2), 1).evalf())
+	    
+	if k <= (l / 2):
+	    if delta_residue(nu, k, l, 3) != 0:
+	        ret.append(sympy.Rational(delta_pole(nu, k, l, 3), 1).evalf())
+
+	k += 1
 
     return ret
 
-def omit_product(poles, special_pole):
+def omit_all(poles, special_pole):
     expression = 1
-    omitted = False
     for p in poles:
-        if p == special_pole and omitted == False:
-	    omitted = True
-	else:
+        if p != special_pole:
 	    expression *= (delta - p)
     return expression
 
@@ -95,12 +109,12 @@ def leading_block(nu, rho_norm, rho_conj, l):
         ret = factorial(l) * sympy.gegenbauer(l, nu, (rho_norm + rho_conj) / (2 * sqrt(rho_norm * rho_conj))) / sympy.rf(2 * nu, l)
     return ret / (((1 - (rho_norm * rho_conj)) ** nu) * sqrt((1 + (rho_norm * rho_conj)) ** 2 - (rho_norm + rho_conj) ** 2))
 
-def meromorphic_block(dim, rho_norm, rho_conj, Delta, l_new, l, kept_pole_order, top):
-    k = 1
+def meromorphic_block(dim, rho_norm, rho_conj, Delta, l, kept_pole_order, top, old_pair, old_series):
+    global dual_poles
+    
     nu = sympy.Rational(dim, 2) - 1
-    # When the recursion relation shifts l, this does not affect the appropriate poles and
-    # residues to use which are still determined by the original spin.
-    summation = leading_block(nu, rho_norm, rho_conj, l_new)
+    summation = leading_block(nu, rho_norm, rho_conj, l)
+    k = 1
     
     # Top says we have not recursed yet and our expression is still expected to have denominators
     # with the free variable delta. Cancelling them later is slow so we do it now.
@@ -108,42 +122,84 @@ def meromorphic_block(dim, rho_norm, rho_conj, Delta, l_new, l, kept_pole_order,
         poles = get_poles(dim, l, kept_pole_order)
 	for p in poles:
 	    summation *= (delta - p)
+    elif old_pair[0] == delta and old_pair[1] in dual_poles:
+	summation *= (old_pair[0] - old_pair[1])
+    
+    if dim % 2 != 0:
+        dual_poles = []
+    
+    # Preparing for infinite residues that may be encountered soon
+    if top == True and dim % 2 == 0:
+	dual_poles = []
+	while (2 * k) <= kept_pole_order:
+	    if k >= nu + l and delta_residue(nu, k, l, 2) != 0:
+	        dual_poles.append(delta_pole(nu, k, l, 2))
+		dual_poles.append(delta_pole(nu, k, l, 2))
+	    k += 1
+	k = 1
     
     while (2 * k) <= kept_pole_order:
         res = delta_residue(nu, k, l, 1)
 	if res != 0:
 	    pole = delta_pole(nu, k, l, 1)
+	    if old_pair[0] == delta and old_pair[1] in dual_poles and Delta != pole:
+	        res *= (old_pair[0] - old_pair[1])
+	    
 	    if top == True:
-	        new_term = res * ((rho_norm * rho_conj) ** k) * omit_product(poles, pole)
-	    else:
+	        new_term = res * ((rho_norm * rho_conj) ** k) * omit_all(poles, pole)
+	    elif Delta != pole:
 	        new_term = res * ((rho_norm * rho_conj) ** k) / (Delta - pole)
-	    summation += new_term * meromorphic_block(dim, rho_norm, rho_conj, pole + 2 * k, l + 2 * k, l, kept_pole_order - 2 * k, False)
+	    else:
+	        current_series = 1
+	        sign = sympy.Rational(2 - old_series, old_series - current_series)
+		if old_pair[0] == delta:
+		    new_term = sign * res * ((rho_norm * rho_conj) ** k)
+		else:
+		    new_term = sign * res * ((rho_norm * rho_conj) ** k) / (old_pair[0] - old_pair[1])
+	    summation += new_term * meromorphic_block(dim, rho_norm, rho_conj, pole + 2 * k, l + 2 * k, kept_pole_order - 2 * k, False, (Delta, pole), 1)
 	
+	# We don't REALLY skip these parts for k >= nu + l
+	# It's just that whenever this happens, the same pole has shown up in one of the other two sections
+	# The fact that it did will be signalled by a divergence that the program runs into
+	# It will handle this divergence in a way equivalent to keeping this term and taking the limit
 	if k < nu + l or dim % 2 != 0:
 	    res = delta_residue(nu, k, l, 2)
 	    if res != 0:
 	        pole = delta_pole(nu, k, l, 2)
+		if old_pair[0] == delta and old_pair[1] in dual_poles and Delta != pole:
+	            res *= (old_pair[0] - old_pair[1])
+		
 		if top == True:
-	            new_term = res * ((rho_norm * rho_conj) ** k) * omit_product(poles, pole)
+	            new_term = res * ((rho_norm * rho_conj) ** k) * omit_all(poles, pole)
 	        else:
 	            new_term = res * ((rho_norm * rho_conj) ** k) / (Delta - pole)
-	        summation += new_term * meromorphic_block(dim, rho_norm, rho_conj, pole + 2 * k, l, l, kept_pole_order - 2 * k, False)
+	        summation += new_term * meromorphic_block(dim, rho_norm, rho_conj, pole + 2 * k, l, kept_pole_order - 2 * k, False, (Delta, pole), 2)
 	
 	if k <= (l / 2):
 	    res = delta_residue(nu, k, l, 3)
 	    if res != 0:
 	        pole = delta_pole(nu, k, l, 3)
+		if old_pair[0] == delta and old_pair[1] in dual_poles and Delta != pole:
+	            res *= (old_pair[0] - old_pair[1])
+		
 	        if top == True:
-	            new_term = res * ((rho_norm * rho_conj) ** k) * omit_product(poles, pole)
-	        else:
+	            new_term = res * ((rho_norm * rho_conj) ** k) * omit_all(poles, pole)
+		elif Delta != pole:
 	            new_term = res * ((rho_norm * rho_conj) ** k) / (Delta - pole)
-	        summation += new_term * meromorphic_block(dim, rho_norm, rho_conj, pole + 2 * k, l - 2 * k, l, kept_pole_order - 2 * k, False)
+		else:
+		    current_series = 3
+	            sign = sympy.Rational(2 - old_series, old_series - current_series)
+		    if old_pair[0] == delta:
+		        new_term = sign * res * ((rho_norm * rho_conj) ** k)
+		    else:
+		        new_term = sign * res * ((rho_norm * rho_conj) ** k) / (old_pair[0] - old_pair[1])
+	        summation += new_term * meromorphic_block(dim, rho_norm, rho_conj, pole + 2 * k, l - 2 * k, kept_pole_order - 2 * k, False, (Delta, pole), 3)
 
 	k += 1
     return summation
 
 def conformal_block(dim, rho_norm, rho_conj, Delta, l, kept_pole_order):
-    return ((rho_norm * rho_conj) ** (Delta / 2)) * meromorphic_block(dim, rho_norm, rho_conj, Delta, l, l, kept_pole_order, True)
+    return ((rho_norm * rho_conj) ** (Delta / 2)) * meromorphic_block(dim, rho_norm, rho_conj, Delta, l, kept_pole_order, True, (0, 0), 0)
 
 class ConformalBlockTable:
     def __init__(self, dim, derivative_order, kept_pole_order, l_max, odd_spins = False):
@@ -449,9 +505,9 @@ class SDP:
 		matrix.append(new_entries)
 	    matrix = mpmath.matrix(matrix)
 	    print "Decomposing matrix of size " + str(degree / 2)
-	    matrix = mpmath.cholesky(matrix)
+	    #matrix = mpmath.cholesky(matrix)
 	    print "Inverting matrix"
-	    matrix = mpmath.inverse(matrix)
+	    #matrix = mpmath.inverse(matrix)
 	    
 	    for d in range(0, (degree / 2) + 1):
 		polynomial_node = doc.createElement("polynomial")
