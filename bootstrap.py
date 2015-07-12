@@ -1,4 +1,5 @@
 #!/usr/bin/env python2
+import xml.dom.minidom
 
 # Use regular sympy sparingly because it is slow
 # Every time we explicitly use it, we should consider implementing such a line in C++
@@ -10,6 +11,12 @@ z_norm = symbols('z_norm')
 z_conj = symbols('z_conj')
 delta  = symbols('delta')
 delta_ext = symbols('delta_ext')
+
+def shifted_prefactor(poles, base, x):
+    product = 1
+    for p in poles:
+        product *= x - p
+    return (base ** x) / product
 
 def delta_pole(nu, k, l, series):
     if series == 1:
@@ -181,7 +188,7 @@ class ConformalBlockTable:
 		        self.n_order.append(n)
 	    self.table.append(derivatives)
 
-class SDP:
+class ConvolvedBlockTable:
     def __init__(self, block_table):
         # Copying everything but the unconvolved table is fine from a memory standpoint
         self.dim = block_table.dim
@@ -209,6 +216,9 @@ class SDP:
 		    else:
 		        expression = expression.diff(z_conj).expand()
 		    
+		    if (m + n) % 2 == 0:
+		        continue
+		    
 		    # Now we replace abstract derivatives with the expressions in the unconvolved table
 		    deriv = expression / (factorial(m) * factorial(n))
 		    for i in range(len(block_table.table[0]) - 1, 0, -1):
@@ -217,3 +227,110 @@ class SDP:
 		    deriv = deriv.subs(g, block_table.table[l][0])
 		    derivatives.append(deriv.subs({z_norm : 0.5, z_conj : 0.5}))
 	    self.table.append(derivatives)
+
+class SDP:
+    def __init__(self, convolved_block_table, dim_ext):
+        # Same story here
+        self.dim = convolved_block_table.dim
+	self.derivative_order = convolved_block_table.derivative_order
+	self.kept_pole_order = convolved_block_table.kept_pole_order
+	self.l_max = convolved_block_table.l_max
+	self.odd_spins = convolved_block_table.odd_spins
+	self.table = []
+	
+	for l in range(0, len(convolved_block_table.table)):
+	    derivatives = []
+	    for i in range(0, len(convolved_block_table.table[l])):
+	        derivatives.append(convolved_block_table.table[l][i].subs(delta_ext, dim_ext))
+	    self.table.append(derivatives)
+    
+    # Polynomials in csympy are not sorted
+    # This determines sorting order from the (coefficient, (delta, exponent)) representation
+    def extract_power(self, term):
+        if term.args == ():
+            return 0
+        elif term.args[1].args == ():
+            return 1
+        else:
+            return term.args[1].args[1]
+    
+    def write_xml(self, gap, spin):
+        if self.odd_spins == False:
+	    spin = spin / 2
+	
+	doc = xml.dom.minidom.Document()
+	root_node = doc.createElement("sdp")
+	doc.appendChild(root_node)
+	
+	objective_node = doc.createElement("objective")
+	matrices_node = doc.createElement("polynomialVectorMatrices")
+	root_node.appendChild(objective_node)
+	root_node.appendChild(matrices_node)
+	
+	# Here, we use indices that match the SDPB specification
+	for n in range(-1, len(self.table[0])):
+	    elt_node = doc.createElement("elt")
+	    elt_node.appendChild(doc.createTextNode("0"))
+	    objective_node.appendChild(elt_node)
+	
+	for j in range(0, len(self.table)):
+	    matrix_node = doc.createElement("polynomialVectorMatrix")
+	    rows_node = doc.createElement("rows")
+	    cols_node = doc.createElement("cols")
+	    elements_node = doc.createElement("elements")
+	    sample_point_node = doc.createElement("samplePoints")
+	    sample_scaling_node = doc.createElement("sampleScalings")
+	    rows_node.appendChild(doc.createTextNode("1"))
+	    cols_node.appendChild(doc.createTextNode("1"))
+	    
+	    degree = 0
+	    if j == spin:
+	        delta_min = gap
+	    elif j == 0:
+	        delta_min = sympy.Rational(self.dim, 2) - 1
+	    else:
+	        delta_min = self.dim + j - 2
+	    vector_node = doc.createElement("polynomialVector")
+	    for n in range(0, len(self.table[j])):
+	        expression = self.table[j][n]
+		expression = expression.expand()
+		# Impose unitarity bounds and the specified gap
+		expression = expression.subs(delta, delta + delta_min)
+		expression = expression.expand()
+		coeff_list = sorted(expression.args, key = self.extract_power)
+		degree = max(degree, len(coeff_list) - 1)
+		
+	        polynomial_node = doc.createElement("polynomial")
+		for d in range(0, len(coeff_list)):
+		    if d == 0:
+		        coeff = eval_double(coeff_list[0])
+		    else:
+		        coeff = eval_double(coeff_list[d].args[0])
+		    
+		    coeff_node = doc.createElement("coeff")
+		    coeff_node.appendChild(doc.createTextNode(str.format('{0:.40f}', coeff)))
+		    polynomial_node.appendChild(coeff_node)
+		vector_node.appendChild(polynomial_node)
+	    elements_node.appendChild(vector_node)
+	    
+	    for d in range(0, degree + 1):
+	        laguerre_point = eval_double(-(pi ** 2) * ((4 * d - 1) ** 2) / (64 * (degree + 1) * log(3 - 2 * sqrt(2))))
+	        elt_node = doc.createElement("elt")
+		elt_node.appendChild(doc.createTextNode(str.format('{0:.40f}', laguerre_point)))
+		sample_point_node.appendChild(elt_node)
+		damped_rational = shifted_prefactor(get_poles(self.dim, j, self.kept_pole_order), 3 - 2 * sqrt(2), laguerre_point + delta_min)
+		elt_node = doc.createElement("elt")
+		elt_node.appendChild(doc.createTextNode(str.format('{0:.40f}', damped_rational)))
+		sample_scaling_node.appendChild(elt_node)
+	    
+	    matrix_node.appendChild(rows_node)
+	    matrix_node.appendChild(cols_node)
+	    matrix_node.appendChild(elements_node)
+	    matrix_node.appendChild(sample_point_node)
+	    matrix_node.appendChild(sample_scaling_node)
+	    matrices_node.appendChild(matrix_node)
+	    
+	xml_file = open("mySDP.xml", "wb")
+	doc.writexml(xml_file, addindent = "    ", newl = "\n")
+	xml_file.close()
+	doc.unlink()
