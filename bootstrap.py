@@ -1,8 +1,6 @@
 #!/usr/bin/env python2
 import xml.dom.minidom
-import scipy.integrate
-import scipy.linalg
-import scipy
+import mpmath
 import os
 
 # Use regular sympy sparingly because it is slow
@@ -19,6 +17,7 @@ delta  = symbols('delta')
 delta_ext = symbols('delta_ext')
 fudge = symbols('fudge')
 rho_cross = 0.17157287525380990239
+mpmath.mp.dps = 100
 
 def get_index(array, element):
     if element in array:
@@ -387,23 +386,25 @@ class SDP:
 	    
 	    bands = []
 	    matrix = []
+	    # One place where arbitrary precision really matters
 	    # We numerically integrate to find the moment matrix for now
 	    for d in range(0, 2 * (degree / 2) + 1):
-	        result = scipy.integrate.quad(self.integrand, 0, scipy.Inf, args = (d, delta_min, poles))
-	        bands.append(result[0])
+	        result = mpmath.quad(lambda x: (x ** d) * shifted_prefactor(poles, rho_cross, x + delta_min), [0, mpmath.inf])
+	        bands.append(result)
 	    for r in range(0, (degree / 2) + 1):
 	        new_entries = []
 	        for s in range(0, (degree / 2) + 1):
 		    new_entries.append(bands[r + s])
 		matrix.append(new_entries)
-	    matrix = scipy.linalg.cholesky(matrix)
-	    matrix = scipy.linalg.inv(matrix)
+	    matrix = mpmath.matrix(matrix)
+	    matrix = mpmath.cholesky(matrix)
+	    matrix = mpmath.inverse(matrix)
 	    
 	    for d in range(0, (degree / 2) + 1):
 		polynomial_node = doc.createElement("polynomial")
 		for q in range(0, d + 1):
 		    coeff_node = doc.createElement("coeff")
-		    coeff_node.appendChild(doc.createTextNode(str.format('{0:.40f}', matrix[q][d])))
+		    coeff_node.appendChild(doc.createTextNode(matrix[d, q].__str__()))
 		    polynomial_node.appendChild(coeff_node)
 		bilinear_basis_node.appendChild(polynomial_node)
 	    
