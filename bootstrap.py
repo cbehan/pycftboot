@@ -51,7 +51,7 @@ def get_poles(dim, l, kept_pole_order):
 	        ret.append(delta_pole(nu, k, l, 3))
 
 	k += 1
-    
+
     # This probably won't change anything
     if nu == 0 and l == 0:
         ret.append(-1)
@@ -157,11 +157,10 @@ class ConformalBlockTable:
 		    # Differentiate with the power of r, then strip it off
 		    # It will be added once more when we make the prefactor
 		    # The poles will be part of it too
-		    expression = (r ** (-delta)) * diff(conformal_block(dim, z_norm, z_conj, delta, l, kept_pole_order), z_norm, m, z_conj, n)
-		    expression = expression.subs([(z_norm, Rational(1, 2)), (z_conj, Rational(1, 2))])
-		    expression = cancel(expression)
-		    # Canceling (and therefore making a rational substitution) is still required because
-		    # of the essential singularity
+		    expression = diff(conformal_block(dim, z_norm, z_conj, delta, l, kept_pole_order), z_norm, m, z_conj, n).subs(r ** delta, 1)
+		    expression = expression.subs([(z_norm, 0.5), (z_conj, 0.5)])
+		    expression = expand(expression)
+		    # If setting the exponent to 1 works, we only need to expand which we can do with floating points
 		    derivatives.append(expression)
 		    # For the 27th element of the list, say what m derivative and what n derivative it corresponds to
 		    if l == 0:
