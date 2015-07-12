@@ -1,8 +1,10 @@
 #!/usr/bin/env python2
 from sympy import *
+import time
 
-dim = 2
-nu = Rational(dim, 2) - 1
+z_norm = symbols('z_norm')
+z_conj = symbols('z_conj')
+delta  = symbols('delta')
 
 def damped_rational(const, poles, base, delta):
     product = 1
@@ -10,7 +12,7 @@ def damped_rational(const, poles, base, delta):
         product *= delta - p
     return const * (base ** delta) / product
 
-def delta_pole(k, l, series):
+def delta_pole(nu, k, l, series):
     if series == 1:
         return 1 - l - 2 * k
     elif series == 2:
@@ -18,12 +20,12 @@ def delta_pole(k, l, series):
     else:
 	return 1 + l + 2 * nu - 2 * k
 
-def delta_residue(k, l, series):
+def delta_residue(nu, k, l, series):
     if series == 1:
         ret = - ((k * factorial(2 * k) ** 2) / (2 ** (4 * k - 1) * factorial(k) ** 4))
 	if l == 0 and nu == 0:
-	    # Check if this needs to be 2
-	    return ret
+	    # Take l to 0, then nu
+	    return ret * 2
 	else:
 	    return ret * (rf(l + 2 * nu, 2 * k) / rf(l + nu, 2 * k))
     elif series == 2:
@@ -31,31 +33,103 @@ def delta_residue(k, l, series):
     else:
 	return - (rf(1 + l - 2 * k, 2 * k) / rf(1 + nu + l - 2 * k, 2 * k)) * ((k * factorial(2 * k) ** 2) / (2 ** (4 * k - 1) * factorial(k) ** 4))
 
-def leading_block(r, eta, l):
+def leading_block(nu, r, eta, l):
     if nu == 0:
-        #ret = cos(2 * l * asin(sqrt((1 - eta) / 2)))
-	ret = chebyt(l, eta)
+	ret = chebyshevt(l, eta)
     else:
         ret = factorial(l) * gegenbauer(l, nu, eta) / rf(2 * nu, l)
     return ret / (((1 - r ** 2) ** nu) * sqrt((1 + r ** 2) ** 2 - 4 * (r * eta) ** 2))
 
-def meromorphic_block(r, eta, delta, l, kept_pole_order):
+def meromorphic_block(dim, r, eta, Delta, l_new, l, kept_pole_order):
     k = 1
-    summation = leading_block(r, eta, l)
+    nu = Rational(dim, 2) - 1
+    # When the recursion relation shifts l, this does not affect the appropriate poles and
+    # residues to use which are still determined by the original spin.
+    summation = leading_block(nu, r, eta, l_new)
     while (2 * k) <= kept_pole_order:
-	summation += delta_residue(k, l, 1) * (r ** (2 * k)) * meromorphic_block(r, eta, delta_pole(k, l, 1) + 2 * k, l + 2 * k, kept_pole_order - 2 * k) / (delta - delta_pole(k, l, 1))
+	summation += delta_residue(nu, k, l, 1) * (r ** (2 * k)) * meromorphic_block(dim, r, eta, delta_pole(nu, k, l, 1) + 2 * k, l + 2 * k, l, kept_pole_order - 2 * k) / (Delta - delta_pole(nu, k, l, 1))
 	
 	if k < nu + l or dim % 2 == 1:
-	    summation += delta_residue(k, l, 2) * (r ** (2 * k)) * meromorphic_block(r, eta, delta_pole(k, l, 2) + 2 * k, l, kept_pole_order - 2 * k) / (delta - delta_pole(k, l, 2))
+	    summation += delta_residue(nu, k, l, 2) * (r ** (2 * k)) * meromorphic_block(dim, r, eta, delta_pole(nu, k, l, 2) + 2 * k, l, l, kept_pole_order - 2 * k) / (Delta - delta_pole(nu, k, l, 2))
 	
 	if k <= (l / 2):
-	    summation += delta_residue(k, l, 3) * (r ** (2 * k)) * meromorphic_block(r, eta, delta_pole(k, l, 3) + 2 * k, l - 2 * k, kept_pole_order - 2 * k) / (delta - delta_pole(k, l, 3))
+	    summation += delta_residue(nu, k, l, 3) * (r ** (2 * k)) * meromorphic_block(dim, r, eta, delta_pole(nu, k, l, 3) + 2 * k, l - 2 * k, l, kept_pole_order - 2 * k) / (Delta - delta_pole(nu, k, l, 3))
+
 	k += 1
     return summation
 
-def conformal_block(z_norm, z_conj, delta, l, kept_pole_order):
-    rho_norm = z_norm / (1 + sqrt(1 - z_norm)) ** 2
-    rho_conj = z_conj / (1 + sqrt(1 - z_conj)) ** 2
+def conformal_block(dim, Z_norm, Z_conj, Delta, l, kept_pole_order):
+    rho_norm = Z_norm / (1 + sqrt(1 - Z_norm)) ** 2
+    rho_conj = Z_conj / (1 + sqrt(1 - Z_conj)) ** 2
     r = sqrt(rho_norm * rho_conj)
     eta = (rho_norm + rho_conj) / (2 * r)
-    return (r ** delta) * meromorphic_block(r, eta, delta, l, kept_pole_order)
+    return (r ** Delta) * meromorphic_block(dim, r, eta, Delta, l, l, kept_pole_order)
+
+class ConformalBlockTable:
+    def __init__(self, dim, derivative_order, kept_pole_order, l_max, odd_spins = False):
+	self.dim = dim
+	self.derivative_order = derivative_order
+	self.kept_pole_order = kept_pole_order
+	self.l_max = l_max
+	self.odd_spins = odd_spins
+	self.m_order = []
+	self.n_order = []
+	self.table = []
+	
+	if odd_spins:
+	    step = 1
+	else:
+	    step = 2
+	
+	rho_norm = z_norm / (1 + sqrt(1 - z_norm)) ** 2
+        rho_conj = z_conj / (1 + sqrt(1 - z_conj)) ** 2
+        r = sqrt(rho_norm * rho_conj)
+
+	# This should be modified for when we need even_derivatives
+	for l in range(0, l_max + 1, step):
+	    derivatives = []
+	    poles = 1
+	    for p in self.get_poles(l):
+	        poles *= (delta - p)
+	
+	    for m in range(0, derivative_order + 1):
+		for n in range(1 - (m % 2), min(m, derivative_order + 1 - m), 2):
+		    # Differentiate with the power of r, then strip it off
+		    # It will be added once more when we make the prefactor
+		    # The poles will be part of it too
+		    expression = (r ** (-delta)) * diff(conformal_block(dim, z_norm, z_conj, delta, l, kept_pole_order), z_norm, m, z_conj, n)
+		    expression = expression.subs([(z_norm, Rational(1, 2)), (z_conj, Rational(1, 2))])
+		    expression = cancel(expression * poles)
+		    # If we cancel poles before plugging in the crossing symmetric point, it takes forever
+		    # If we plug in a non-symbolic value like 0.5, they don't cancel properly
+		    derivatives.append(expression)
+		    # For the 27th element of the list, say what m derivative and what n derivative it corresponds to
+		    if l == 0:
+		        self.m_order.append(m)
+		        self.n_order.append(n)
+	    self.table.append(derivatives)
+    
+    def get_poles(self, l):
+	nu = Rational(self.dim, 2) - 1
+	
+	k = 1
+	ret = []
+	while (2 * k) <= self.kept_pole_order:
+	    if delta_residue(nu, k, l, 1) != 0:
+	        ret.append(delta_pole(nu, k, l, 1))
+	    
+	    if k < nu + l or self.dim % 2 == 1:
+	        if delta_residue(nu, k, l, 2) != 0:
+	            ret.append(delta_pole(nu, k, l, 2))
+	    
+	    if k <= (l / 2):
+	        if delta_residue(nu, k, l, 3) != 0:
+	            ret.append(delta_pole(nu, k, l, 3))
+	    
+	    k += 1
+	
+	# This probably won't change anything
+	if nu == 0 and l == 0:
+	    ret.append(-1)
+	
+	return ret
