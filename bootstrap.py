@@ -67,19 +67,19 @@ def omit_product(poles, special_pole):
 	    expression *= (delta - p)
     return expression
 
-def leading_block(nu, r, eta, l):
+def leading_block(nu, rho_norm, rho_conj, l):
     if nu == 0:
-        ret = sympy.chebyshevt(l, eta)
+        ret = sympy.chebyshevt(l, (rho_norm + rho_conj) / (2 * sqrt(rho_norm * rho_conj)))
     else:
-        ret = factorial(l) * sympy.gegenbauer(l, nu, eta) / sympy.rf(2 * nu, l)
-    return ret / (((1 - r ** 2) ** nu) * sqrt((1 + r ** 2) ** 2 - 4 * (r * eta) ** 2))
+        ret = factorial(l) * sympy.gegenbauer(l, nu, (rho_norm + rho_conj) / (2 * sqrt(rho_norm * rho_conj))) / sympy.rf(2 * nu, l)
+    return ret / (((1 - (rho_norm * rho_conj)) ** nu) * sqrt((1 + (rho_norm * rho_conj)) ** 2 - (rho_norm + rho_conj) ** 2))
 
-def meromorphic_block(dim, r, eta, Delta, l_new, l, kept_pole_order, top):
+def meromorphic_block(dim, rho_norm, rho_conj, Delta, l_new, l, kept_pole_order, top):
     k = 1
     nu = sympy.Rational(dim, 2) - 1
     # When the recursion relation shifts l, this does not affect the appropriate poles and
     # residues to use which are still determined by the original spin.
-    summation = leading_block(nu, r, eta, l_new)
+    summation = leading_block(nu, rho_norm, rho_conj, l_new)
     
     # Top says we have not recursed yet and our expression is still expected to have denominators
     # with the free variable delta. Cancelling them later is slow so we do it now.
@@ -93,38 +93,36 @@ def meromorphic_block(dim, r, eta, Delta, l_new, l, kept_pole_order, top):
 	if res != 0:
 	    pole = delta_pole(nu, k, l, 1)
 	    if top == True:
-	        new_term = res * (r ** (2 * k)) * omit_product(poles, pole)
+	        new_term = res * ((rho_norm * rho_conj) ** k) * omit_product(poles, pole)
 	    else:
-	        new_term = res * (r ** (2 * k)) / (Delta - pole)
-	    summation += new_term * meromorphic_block(dim, r, eta, pole + 2 * k, l + 2 * k, l, kept_pole_order - 2 * k, False)
+	        new_term = res * ((rho_norm * rho_conj) ** k) / (Delta - pole)
+	    summation += new_term * meromorphic_block(dim, rho_norm, rho_conj, pole + 2 * k, l + 2 * k, l, kept_pole_order - 2 * k, False)
 	
 	if k < nu + l or dim % 2 == 1:
 	    res = delta_residue(nu, k, l, 2)
 	    if res != 0:
 	        pole = delta_pole(nu, k, l, 2)
 		if top == True:
-	            new_term = res * (r ** (2 * k)) * omit_product(poles, pole)
+	            new_term = res * ((rho_norm * rho_conj) ** k) * omit_product(poles, pole)
 	        else:
-	            new_term = res * (r ** (2 * k)) / (Delta - pole)
-	        summation += new_term * meromorphic_block(dim, r, eta, pole + 2 * k, l, l, kept_pole_order - 2 * k, False)
+	            new_term = res * ((rho_norm * rho_conj) ** k) / (Delta - pole)
+	        summation += new_term * meromorphic_block(dim, rho_norm, rho_conj, pole + 2 * k, l, l, kept_pole_order - 2 * k, False)
 	
 	if k <= (l / 2):
 	    res = delta_residue(nu, k, l, 3)
 	    if res != 0:
 	        pole = delta_pole(nu, k, l, 3)
 	        if top == True:
-	            new_term = res * (r ** (2 * k)) * omit_product(poles, pole)
+	            new_term = res * ((rho_norm * rho_conj) ** k) * omit_product(poles, pole)
 	        else:
-	            new_term = res * (r ** (2 * k)) / (Delta - pole)
-	        summation += new_term * meromorphic_block(dim, r, eta, pole + 2 * k, l - 2 * k, l, kept_pole_order - 2 * k, False)
+	            new_term = res * ((rho_norm * rho_conj) ** k) / (Delta - pole)
+	        summation += new_term * meromorphic_block(dim, rho_norm, rho_conj, pole + 2 * k, l - 2 * k, l, kept_pole_order - 2 * k, False)
 
 	k += 1
     return summation
 
 def conformal_block(dim, rho_norm, rho_conj, Delta, l, kept_pole_order):
-    r = sqrt(rho_norm * rho_conj)
-    eta = (rho_norm + rho_conj) / (2 * r)
-    return (r ** Delta) * meromorphic_block(dim, r, eta, Delta, l, l, kept_pole_order, True)
+    return ((rho_norm * rho_conj) ** (Delta / 2)) * meromorphic_block(dim, rho_norm, rho_conj, Delta, l, l, kept_pole_order, True)
 
 class ConformalBlockTable:
     def __init__(self, dim, derivative_order, kept_pole_order, l_max, odd_spins = False):
@@ -156,25 +154,20 @@ class ConformalBlockTable:
 	# This is because csympy can only compute them one at a time, but it's faster anyway
 	for l in range(0, l_max + 1, step):
 	    derivatives = []
-	    expressions = []
+	    old_expression = conformal_block(dim, rho_n, rho_c, delta, l, kept_pole_order)
 	    
-	    # Multiplying a list twice is weird in Python
-	    # If this were a numpy array, it would have to store floats
-	    for i in range(0, derivative_order + 1):
-	        expressions.append([0] * (derivative_order + 1))
-	    
-	    expressions[0][0] = conformal_block(dim, rho_n, rho_c, delta, l, kept_pole_order)
 	    for m in range(0, derivative_order + 1):
 		for n in range(0, min(m, derivative_order - m) + 1):
-		    if n == 0 and m != 0:
-		        expressions[m][0] = expressions[m - 1][0].diff(z_norm)
-		    elif n > 0:
-		        expressions[m][n] = expressions[m][n - 1].diff(z_conj)
+		    # Each loop has one expansion that it can do without
+		    if n == 0 and m == 0:
+		        expression = old_expression
+		    elif n == 0:
+		        old_expression = old_expression.diff(z_norm).expand()
+			expression = old_expression
+		    else:
+		        expression = expression.diff(z_conj).expand()
 		    
-		    # We need to expand before we evaluate to have the essential singularity cancel
-		    deriv = expressions[m][n] * (sqrt(rho_n * rho_c) ** (-delta))
-		    deriv = deriv.expand()
-		    
+		    deriv = expression * ((rho_n * rho_c) ** (-delta / 2))
 		    for i in range(m, 0, -1):
 		        deriv = deriv.subs(Derivative(rho_n, [z_norm] * i), rules[i])
 		    for j in range(n, 0, -1):
@@ -188,7 +181,7 @@ class ConformalBlockTable:
 		        self.n_order.append(n)
 	    self.table.append(derivatives)
 
-class ConvolvedBlockTable:
+class SDP:
     def __init__(self, block_table):
         # Copying everything but the unconvolved table is fine from a memory standpoint
         self.dim = block_table.dim
@@ -204,21 +197,20 @@ class ConvolvedBlockTable:
 	# Same comments apply here
 	for l in range(0, len(block_table.table)):
 	    derivatives = []
-	    expressions = []
+	    old_expression = f
 	    
-	    for i in range(0, block_table.derivative_order + 1):
-	        expressions.append([0] * (block_table.derivative_order + 1))
-	    
-	    expressions[0][0] = f
 	    for m in range(0, block_table.derivative_order + 1):
 		for n in range(0, min(m, block_table.derivative_order - m) + 1):
-		    if n == 0 and m != 0:
-		        expressions[m][0] = expressions[m - 1][0].diff(z_norm)
-		    elif n > 0:
-		        expressions[m][n] = expressions[m][n - 1].diff(z_conj)
+		    if n == 0 and m == 0:
+		        expression = old_expression
+		    elif n == 0:
+		        old_expression = old_expression.diff(z_norm).expand()
+			expression = old_expression
+		    else:
+		        expression = expression.diff(z_conj).expand()
 		    
 		    # Now we replace abstract derivatives with the expressions in the unconvolved table
-		    deriv = expressions[m][n] / (factorial(m) * factorial(n))
+		    deriv = expression / (factorial(m) * factorial(n))
 		    for i in range(len(block_table.table[0]) - 1, 0, -1):
 		        deriv = deriv.subs(Derivative(g, [z_norm] * block_table.m_order[i] + [z_conj] * block_table.n_order[i]), block_table.table[l][i])
 		    
