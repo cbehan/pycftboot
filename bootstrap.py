@@ -1,5 +1,9 @@
 #!/usr/bin/env python2
 import xml.dom.minidom
+import scipy.integrate
+import scipy.linalg
+import scipy
+import os
 
 # Use regular sympy sparingly because it is slow
 # Every time we explicitly use it, we should consider implementing such a line in C++
@@ -7,10 +11,20 @@ from csympy import *
 from csympy.lib.csympy_wrapper import *
 import sympy
 
+# A bug sometimes occurs when shifting the variable of a polynomial
+# It is caused by a constant term, so we include an extra monomial and set it to unity at the end
 z_norm = symbols('z_norm')
 z_conj = symbols('z_conj')
 delta  = symbols('delta')
 delta_ext = symbols('delta_ext')
+fudge = symbols('fudge')
+rho_cross = 0.17157287525380990239
+
+def get_index(array, element):
+    if element in array:
+        return array.index(element)
+    else:
+        return -1
 
 def shifted_prefactor(poles, base, x):
     product = 1
@@ -160,6 +174,7 @@ class ConformalBlockTable:
 	# We cache derivatives as we go
 	# This is because csympy can only compute them one at a time, but it's faster anyway
 	for l in range(0, l_max + 1, step):
+            print "Spin = " + str(l)
 	    derivatives = []
 	    old_expression = conformal_block(dim, rho_n, rho_c, delta, l, kept_pole_order)
 	    
@@ -180,8 +195,8 @@ class ConformalBlockTable:
 		    for j in range(n, 0, -1):
 		        deriv = deriv.subs(Derivative(rho_c, [z_conj] * j), rules[j])
 		    deriv = deriv.subs(rho_n, rules[0]).subs(rho_c, rules[0])
+		    derivatives.append(fudge * deriv.expand())
 		    
-		    derivatives.append(deriv)
 		    # For the 27th element of the list, say what m derivative and what n derivative it corresponds to
 		    if l == 0:
 		        self.m_order.append(m)
@@ -197,6 +212,7 @@ class ConvolvedBlockTable:
 	self.l_max = block_table.l_max
 	self.odd_spins = block_table.odd_spins
 	self.table = []
+	self.norm = []
 	
 	g = function_symbol('g', z_norm, z_conj)
 	f = (((1 - z_norm) * (1 - z_conj)) ** delta_ext) * g
@@ -216,6 +232,7 @@ class ConvolvedBlockTable:
 		    else:
 		        expression = expression.diff(z_conj).expand()
 		    
+		    # Skip even derivatives
 		    if (m + n) % 2 == 0:
 		        continue
 		    
@@ -225,24 +242,47 @@ class ConvolvedBlockTable:
 		        deriv = deriv.subs(Derivative(g, [z_norm] * block_table.m_order[i] + [z_conj] * block_table.n_order[i]), block_table.table[l][i])
 		    
 		    deriv = deriv.subs(g, block_table.table[l][0])
-		    derivatives.append(deriv.subs({z_norm : 0.5, z_conj : 0.5}))
+		    derivatives.append(2 * deriv.subs({z_norm : 0.5, z_conj : 0.5}))
+		    
+		    # Do this once for the unit operator too
+		    if l == 0:
+		        deriv = expression / (factorial(m) * factorial(n))
+			deriv = deriv.subs(Derivative(g, [z_norm]), 0).subs(Derivative(g, [z_conj]), 0).subs(g, 1)
+			self.norm.append(2 * deriv.subs({z_norm : 0.5, z_conj : 0.5}))
 	    self.table.append(derivatives)
 
 class SDP:
-    def __init__(self, convolved_block_table, dim_ext):
+    def __init__(self, conv_block_table, dim_ext):
         # Same story here
-        self.dim = convolved_block_table.dim
-	self.derivative_order = convolved_block_table.derivative_order
-	self.kept_pole_order = convolved_block_table.kept_pole_order
-	self.l_max = convolved_block_table.l_max
-	self.odd_spins = convolved_block_table.odd_spins
+        self.dim = conv_block_table.dim
+	self.derivative_order = conv_block_table.derivative_order
+	self.kept_pole_order = conv_block_table.kept_pole_order
+	self.l_max = conv_block_table.l_max
+	self.odd_spins = conv_block_table.odd_spins
+	self.norm = []
 	self.table = []
 	
-	for l in range(0, len(convolved_block_table.table)):
+	max_index = 0
+	max_unit = 0
+
+	for l in range(0, len(conv_block_table.table)):
 	    derivatives = []
-	    for i in range(0, len(convolved_block_table.table[l])):
-	        derivatives.append(convolved_block_table.table[l][i].subs(delta_ext, dim_ext))
+	    for i in range(0, len(conv_block_table.table[l])):
+	        derivatives.append(conv_block_table.table[l][i].subs(delta_ext, dim_ext))
+		if l == 0:
+		    unit = conv_block_table.norm[i].subs(delta_ext, dim_ext)
+		    if unit > max_unit:
+		        max_unit = unit
+			max_index = i
+		    self.norm.append(unit)
 	    self.table.append(derivatives)
+	
+	# Translate between the mathematica definition and the bootstrap definition of SDP
+	for l in range(0, len(conv_block_table.table)):
+	    const = self.table[l][max_index] / self.norm[max_index]
+	    for i in range(0, len(self.table[l])):
+	        self.table[l][i] -= const * self.norm[i]
+	    self.table[l] = [const] + self.table[l][:max_index] + self.table[l][max_index + 1:]
     
     # Polynomials in csympy are not sorted
     # This determines sorting order from the (coefficient, (delta, exponent)) representation
@@ -254,9 +294,19 @@ class SDP:
         else:
             return term.args[1].args[1]
     
-    def write_xml(self, gap, spin):
-        if self.odd_spins == False:
-	    spin = spin / 2
+    def make_laguerre_points(self, degree):
+        ret = []
+        for d in range(0, degree + 1):
+	    point = -(sympy.pi ** 2) * ((4 * d - 1) ** 2) / (64 * (degree + 1) * sympy.log(3 - 2 * sympy.sqrt(2)))
+	    ret.append(point)
+	return ret
+    
+    def integrand(self, x, pos, shift, poles):
+        return (x ** pos) * shifted_prefactor(poles, rho_cross, x + shift)
+    
+    def write_xml(self, gap, gapped_spin):
+        laguerre_points = []
+	laguerre_degrees = []
 	
 	doc = xml.dom.minidom.Document()
 	root_node = doc.createElement("sdp")
@@ -268,35 +318,39 @@ class SDP:
 	root_node.appendChild(matrices_node)
 	
 	# Here, we use indices that match the SDPB specification
-	for n in range(-1, len(self.table[0])):
+	for n in range(0, len(self.table[0])):
 	    elt_node = doc.createElement("elt")
 	    elt_node.appendChild(doc.createTextNode("0"))
 	    objective_node.appendChild(elt_node)
 	
 	for j in range(0, len(self.table)):
+	    if self.odd_spins:
+	        spin = j
+	    else:
+	        spin = 2 * j
 	    matrix_node = doc.createElement("polynomialVectorMatrix")
 	    rows_node = doc.createElement("rows")
 	    cols_node = doc.createElement("cols")
 	    elements_node = doc.createElement("elements")
 	    sample_point_node = doc.createElement("samplePoints")
 	    sample_scaling_node = doc.createElement("sampleScalings")
+	    bilinear_basis_node = doc.createElement("bilinearBasis")
 	    rows_node.appendChild(doc.createTextNode("1"))
 	    cols_node.appendChild(doc.createTextNode("1"))
 	    
 	    degree = 0
-	    if j == spin:
+	    if spin == gapped_spin:
 	        delta_min = gap
-	    elif j == 0:
+	    elif spin == 0:
 	        delta_min = sympy.Rational(self.dim, 2) - 1
 	    else:
-	        delta_min = self.dim + j - 2
+	        delta_min = self.dim + spin - 2
 	    vector_node = doc.createElement("polynomialVector")
 	    for n in range(0, len(self.table[j])):
-	        expression = self.table[j][n]
-		expression = expression.expand()
+	        expression = self.table[j][n].expand()
 		# Impose unitarity bounds and the specified gap
-		expression = expression.subs(delta, delta + delta_min)
-		expression = expression.expand()
+		expression = expression.subs(delta, delta + delta_min).expand()
+		expression = expression.subs(fudge, 1).expand()
 		coeff_list = sorted(expression.args, key = self.extract_power)
 		degree = max(degree, len(coeff_list) - 1)
 		
@@ -313,24 +367,76 @@ class SDP:
 		vector_node.appendChild(polynomial_node)
 	    elements_node.appendChild(vector_node)
 	    
+	    poles = get_poles(self.dim, spin, self.kept_pole_order)
+	    index = get_index(laguerre_degrees, degree)
+	    if index == -1:
+	        points = self.make_laguerre_points(degree)
+		laguerre_points.append(points)
+		laguerre_degrees.append(degree)
+	    else:
+	        points = laguerre_points[index]
+	    
 	    for d in range(0, degree + 1):
-	        laguerre_point = eval_double(-(pi ** 2) * ((4 * d - 1) ** 2) / (64 * (degree + 1) * log(3 - 2 * sqrt(2))))
 	        elt_node = doc.createElement("elt")
-		elt_node.appendChild(doc.createTextNode(str.format('{0:.40f}', laguerre_point)))
+		elt_node.appendChild(doc.createTextNode(str.format('{0:.40f}', points[d].evalf())))
 		sample_point_node.appendChild(elt_node)
-		damped_rational = shifted_prefactor(get_poles(self.dim, j, self.kept_pole_order), 3 - 2 * sqrt(2), laguerre_point + delta_min)
+		damped_rational = shifted_prefactor(poles, rho_cross, points[d] + delta_min)
 		elt_node = doc.createElement("elt")
-		elt_node.appendChild(doc.createTextNode(str.format('{0:.40f}', damped_rational)))
+		elt_node.appendChild(doc.createTextNode(str.format('{0:.40f}', damped_rational.evalf())))
 		sample_scaling_node.appendChild(elt_node)
+	    
+	    bands = []
+	    matrix = []
+	    # We numerically integrate to find the moment matrix for now
+	    for d in range(0, 2 * (degree / 2) + 1):
+	        result = scipy.integrate.quad(self.integrand, 0, scipy.Inf, args = (d, delta_min, poles))
+	        bands.append(result[0])
+	    for r in range(0, (degree / 2) + 1):
+	        new_entries = []
+	        for s in range(0, (degree / 2) + 1):
+		    new_entries.append(bands[r + s])
+		matrix.append(new_entries)
+	    matrix = scipy.linalg.cholesky(matrix)
+	    matrix = scipy.linalg.inv(matrix)
+	    
+	    for d in range(0, (degree / 2) + 1):
+		polynomial_node = doc.createElement("polynomial")
+		for q in range(0, d + 1):
+		    coeff_node = doc.createElement("coeff")
+		    coeff_node.appendChild(doc.createTextNode(str.format('{0:.40f}', matrix[q][d])))
+		    polynomial_node.appendChild(coeff_node)
+		bilinear_basis_node.appendChild(polynomial_node)
 	    
 	    matrix_node.appendChild(rows_node)
 	    matrix_node.appendChild(cols_node)
 	    matrix_node.appendChild(elements_node)
 	    matrix_node.appendChild(sample_point_node)
 	    matrix_node.appendChild(sample_scaling_node)
+	    matrix_node.appendChild(bilinear_basis_node)
 	    matrices_node.appendChild(matrix_node)
 	    
-	xml_file = open("mySDP.xml", "wb")
-	doc.writexml(xml_file, addindent = "    ", newl = "\n")
+	xml_file = open("mySDP.xml", 'wb')
+	doc.writexml(xml_file, addindent = "    ", newl = '\n')
 	xml_file.close()
 	doc.unlink()
+    
+    def bisect(self, lower, upper, threshold, spin):
+        test = (lower + upper) / 2.0
+        if abs(upper - lower) < threshold:
+	    return upper
+	else:
+	    print "Trying " + str(test)
+	    self.write_xml(test, spin)
+	    os.spawnlp(os.P_WAIT, "sdpb", "-s", "mySDP.xml", "--findPrimalFeasible", "--findDualFeasible", "--noFinalCheckpoint")
+	    out_file = open("mySDP.out", 'r')
+	    terminate_line = out_file.next()
+	    terminate_reason = terminate_line.partition(" = ")[-1]
+	    out_file.close()
+	    
+	    excluded = False
+	    if terminate_reason == '"found dual feasible solution";\n':
+	        excluded = True
+	    if excluded == True:
+	        return self.bisect(lower, test, threshold, spin)
+	    else:
+	        return self.bisect(test, upper, threshold, spin)
