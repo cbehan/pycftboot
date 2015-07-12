@@ -11,13 +11,13 @@ import sympy
 
 # A bug sometimes occurs when shifting the variable of a polynomial
 # It is caused by a constant term, so we include an extra monomial and set it to unity at the end
+mpmath.mp.dps = 200
 z_norm = symbols('z_norm')
 z_conj = symbols('z_conj')
 delta  = symbols('delta')
 delta_ext = symbols('delta_ext')
 fudge = symbols('fudge')
-rho_cross = 0.17157287525380990239
-mpmath.mp.dps = 100
+rho_cross = 3 - 2 * mpmath.sqrt(2)
 
 def get_index(array, element):
     if element in array:
@@ -25,10 +25,10 @@ def get_index(array, element):
     else:
         return -1
 
-def shifted_prefactor(poles, base, x):
+def shifted_prefactor(poles, base, x, shift):
     product = 1
     for p in poles:
-        product *= x - p
+        product *= x - (p - shift)
     return (base ** x) / product
 
 def delta_pole(nu, k, l, series):
@@ -61,7 +61,7 @@ def get_poles(dim, l, kept_pole_order):
         if delta_residue(nu, k, l, 1) != 0:
 	    ret.append(delta_pole(nu, k, l, 1))
 	    
-	if k < nu + l or dim % 2 == 1:
+	if k < nu + l or dim % 2 != 0:
 	    if delta_residue(nu, k, l, 2) != 0:
 	        ret.append(delta_pole(nu, k, l, 2))
 	    
@@ -74,6 +74,7 @@ def get_poles(dim, l, kept_pole_order):
     # This probably won't change anything
     if nu == 0 and l == 0:
         ret.append(-1)
+        #ret.append(sympy.Rational(-13, 10))
 
     return ret
 
@@ -118,7 +119,7 @@ def meromorphic_block(dim, rho_norm, rho_conj, Delta, l_new, l, kept_pole_order,
 	        new_term = res * ((rho_norm * rho_conj) ** k) / (Delta - pole)
 	    summation += new_term * meromorphic_block(dim, rho_norm, rho_conj, pole + 2 * k, l + 2 * k, l, kept_pole_order - 2 * k, False)
 	
-	if k < nu + l or dim % 2 == 1:
+	if k < nu + l or dim % 2 != 0:
 	    res = delta_residue(nu, k, l, 2)
 	    if res != 0:
 	        pole = delta_pole(nu, k, l, 2)
@@ -178,7 +179,7 @@ class ConformalBlockTable:
 	    old_expression = conformal_block(dim, rho_n, rho_c, delta, l, kept_pole_order)
 	    
 	    for m in range(0, derivative_order + 1):
-		for n in range(0, min(m, derivative_order - m) + 1):
+		for n in range(0, min(((derivative_order + 1) / 2), derivative_order - m) + 1):
 		    # Each loop has one expansion that it can do without
 		    if n == 0 and m == 0:
 		        expression = old_expression
@@ -296,12 +297,56 @@ class SDP:
     def make_laguerre_points(self, degree):
         ret = []
         for d in range(0, degree + 1):
-	    point = -(sympy.pi ** 2) * ((4 * d - 1) ** 2) / (64 * (degree + 1) * sympy.log(3 - 2 * sympy.sqrt(2)))
+	    point = -(mpmath.pi ** 2) * ((4 * d - 1) ** 2) / (64 * (degree + 1) * mpmath.log(rho_cross))
 	    ret.append(point)
 	return ret
     
     def integrand(self, x, pos, shift, poles):
-        return (x ** pos) * shifted_prefactor(poles, rho_cross, x + shift)
+        return (rho_cross ** shift) * (x ** pos) * shifted_prefactor(poles, rho_cross, x, shift)
+    
+    def integral(self, pos, shift, poles):
+        single_poles = []
+	double_poles = []
+	ret = 0
+	
+	for p in poles:
+	    if (p - shift) in single_poles:
+	        single_poles.remove(p - shift)
+		double_poles.append(p - shift)
+	    else:
+	        single_poles.append(p - shift)
+	
+	for i in range(0, len(single_poles)):
+	    denom = 1
+	    pole = single_poles[i]
+	    other_single_poles = single_poles[:i] + single_poles[i + 1:]
+	    for p in other_single_poles:
+	        denom *= pole - p
+	    for p in double_poles:
+	        denom *= (pole - p) ** 2
+	    ret += (1.0 / denom) * (rho_cross ** pole) * ((-pole) ** pos) * mpmath.factorial(pos) * mpmath.gammainc(-pos, a = pole * mpmath.log(rho_cross))
+	
+	for i in range(0, len(double_poles)):
+	    denom = 1
+	    pole = double_poles[i]
+	    other_double_poles = double_poles[:i] + double_poles[i + 1:]
+	    for p in other_double_poles:
+	        denom *= (pole - p) ** 2
+	    for p in single_poles:
+	        denom *= pole - p
+	    # Contribution of the most divergent part
+	    ret += (1.0 / (pole * denom)) * ((-1) ** (pos + 1)) * mpmath.factorial(pos) * ((mpmath.log(rho_cross)) ** (-pos))
+	    ret -= (1.0 / denom) * (rho_cross ** pole) * ((-pole) ** (pos - 1)) * mpmath.factorial(pos) * mpmath.gammainc(-pos, a = pole * mpmath.log(rho_cross)) * (pos + pole * mpmath.log(rho_cross))
+	    
+	    factor = 0
+	    for p in other_double_poles:
+	        factor -= 2.0 / (pole - p)
+	    for p in single_poles:
+	        factor -= 1.0 / (pole - p)
+	    # Contribution of the least divergent part
+	    ret += (factor / denom) * (rho_cross ** pole) * ((-pole) ** pos) * mpmath.factorial(pos) * mpmath.gammainc(-pos, a = pole * mpmath.log(rho_cross))
+	
+	return (rho_cross ** shift) * ret
     
     def write_xml(self, gap, gapped_spin):
         laguerre_points = []
@@ -361,11 +406,12 @@ class SDP:
 		        coeff = eval_double(coeff_list[d].args[0])
 		    
 		    coeff_node = doc.createElement("coeff")
-		    coeff_node.appendChild(doc.createTextNode(str.format('{0:.40f}', coeff)))
+		    coeff_node.appendChild(doc.createTextNode(str.format('{0:.200f}', coeff)))
 		    polynomial_node.appendChild(coeff_node)
 		vector_node.appendChild(polynomial_node)
 	    elements_node.appendChild(vector_node)
 	    
+	    print "Getting points"
 	    poles = get_poles(self.dim, spin, self.kept_pole_order)
 	    index = get_index(laguerre_degrees, degree)
 	    if index == -1:
@@ -375,29 +421,36 @@ class SDP:
 	    else:
 	        points = laguerre_points[index]
 	    
+	    print "Evaluating them"
 	    for d in range(0, degree + 1):
 	        elt_node = doc.createElement("elt")
-		elt_node.appendChild(doc.createTextNode(str.format('{0:.40f}', points[d].evalf())))
+		elt_node.appendChild(doc.createTextNode(points[d].__str__()))
 		sample_point_node.appendChild(elt_node)
-		damped_rational = shifted_prefactor(poles, rho_cross, points[d] + delta_min)
+		damped_rational = shifted_prefactor(poles, rho_cross, points[d], delta_min)
 		elt_node = doc.createElement("elt")
-		elt_node.appendChild(doc.createTextNode(str.format('{0:.40f}', damped_rational.evalf())))
+		elt_node.appendChild(doc.createTextNode(damped_rational.__str__()))
 		sample_scaling_node.appendChild(elt_node)
 	    
 	    bands = []
 	    matrix = []
 	    # One place where arbitrary precision really matters
 	    # We numerically integrate to find the moment matrix for now
+	    print "Getting bands"
 	    for d in range(0, 2 * (degree / 2) + 1):
-	        result = mpmath.quad(lambda x: (x ** d) * shifted_prefactor(poles, rho_cross, x + delta_min), [0, mpmath.inf])
-	        bands.append(result)
+	        #result1 = mpmath.quad(lambda x: self.integrand(x, d, delta_min, poles), [0, mpmath.inf])
+	        result2 = self.integral(d, delta_min, poles)
+		#print result1
+		#print result2
+		bands.append(result2)
 	    for r in range(0, (degree / 2) + 1):
 	        new_entries = []
 	        for s in range(0, (degree / 2) + 1):
 		    new_entries.append(bands[r + s])
 		matrix.append(new_entries)
 	    matrix = mpmath.matrix(matrix)
+	    print "Decomposing matrix of size " + str(degree / 2)
 	    matrix = mpmath.cholesky(matrix)
+	    print "Inverting matrix"
 	    matrix = mpmath.inverse(matrix)
 	    
 	    for d in range(0, (degree / 2) + 1):
@@ -428,16 +481,13 @@ class SDP:
 	else:
 	    print "Trying " + str(test)
 	    self.write_xml(test, spin)
-	    os.spawnlp(os.P_WAIT, "sdpb", "-s", "mySDP.xml", "--findPrimalFeasible", "--findDualFeasible", "--noFinalCheckpoint")
+	    os.spawnlp(os.P_WAIT, "/usr/bin/sdpb", "sdpb", "-s", "mySDP.xml", "--findPrimalFeasible", "--findDualFeasible", "--noFinalCheckpoint")
 	    out_file = open("mySDP.out", 'r')
 	    terminate_line = out_file.next()
 	    terminate_reason = terminate_line.partition(" = ")[-1]
 	    out_file.close()
 	    
-	    excluded = False
 	    if terminate_reason == '"found dual feasible solution";\n':
-	        excluded = True
-	    if excluded == True:
 	        return self.bisect(lower, test, threshold, spin)
 	    else:
 	        return self.bisect(test, upper, threshold, spin)
