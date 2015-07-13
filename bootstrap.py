@@ -5,8 +5,8 @@ import os
 
 # Use regular sympy sparingly because it is slow
 # Every time we explicitly use it, we should consider implementing such a line in C++
-from csympy import *
-from csympy.lib.csympy_wrapper import *
+from symengine import *
+from symengine.lib.symengine_wrapper import *
 import sympy
 
 # A bug sometimes occurs when shifting the variable of a polynomial
