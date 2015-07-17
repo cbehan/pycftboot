@@ -12,8 +12,11 @@ import sympy
 # A bug sometimes occurs when shifting the variable of a polynomial
 # It is caused by a constant term, so we include an extra monomial and set it to unity at the end
 mpmath.mp.dps = 200
-z_norm = symbols('z_norm')
-z_conj = symbols('z_conj')
+s_matrix = []
+r_powers = []
+leading_blocks = []
+r_cross = eval_mpfr(3 - 2 * sqrt(2), 100)
+z_cross = eval_mpfr(sympy.Rational(1, 2), 100)
 delta  = symbols('delta')
 delta_ext = symbols('delta_ext')
 fudge = symbols('fudge')
@@ -102,104 +105,156 @@ def omit_all(poles, special_pole):
 	    expression *= (delta - p)
     return expression
 
-def leading_block(nu, rho_norm, rho_conj, l):
+def leading_block(nu, R, Eta, l):
     if nu == 0:
-        ret = sympy.chebyshevt(l, (rho_norm + rho_conj) / (2 * sqrt(rho_norm * rho_conj)))
+        ret = sympy.chebyshevt(l, Eta)
     else:
-        ret = factorial(l) * sympy.gegenbauer(l, nu, (rho_norm + rho_conj) / (2 * sqrt(rho_norm * rho_conj))) / sympy.rf(2 * nu, l)
-    return ret / (((1 - (rho_norm * rho_conj)) ** nu) * sqrt((1 + (rho_norm * rho_conj)) ** 2 - (rho_norm + rho_conj) ** 2))
+        ret = factorial(l) * sympy.gegenbauer(l, nu, Eta) / sympy.rf(2 * nu, l)
+    return ret / (((1 - R ** 2) ** nu) * sqrt((1 + R ** 2) ** 2 - 4 * (R * Eta) ** 2))
 
-def meromorphic_block(dim, rho_norm, rho_conj, Delta, l, kept_pole_order, top, old_pair, old_series):
-    global dual_poles
-    
-    nu = sympy.Rational(dim, 2) - 1
-    summation = leading_block(nu, rho_norm, rho_conj, l)
-    k = 1
-    
-    # Top says we have not recursed yet and our expression is still expected to have denominators
-    # with the free variable delta. Cancelling them later is slow so we do it now.
-    if top == True:
-        poles = get_poles(dim, l, kept_pole_order)
-	for p in poles:
-	    summation *= (delta - p)
-    elif old_pair[0] == delta and old_pair[1] in dual_poles:
-	summation *= (old_pair[0] - old_pair[1])
-    
-    if dim % 2 != 0:
-        dual_poles = []
-    
-    # Preparing for infinite residues that may be encountered soon
-    if top == True and dim % 2 == 0:
-	dual_poles = []
-	while (2 * k) <= kept_pole_order:
-	    if k >= nu + l and delta_residue(nu, k, l, 2) != 0:
-	        dual_poles.append(delta_pole(nu, k, l, 2))
-		dual_poles.append(delta_pole(nu, k, l, 2))
-	    k += 1
-	k = 1
-    
-    while (2 * k) <= kept_pole_order:
-        res = delta_residue(nu, k, l, 1)
-	if res != 0:
-	    pole = delta_pole(nu, k, l, 1)
-	    if old_pair[0] == delta and old_pair[1] in dual_poles and Delta != pole:
-	        res *= (old_pair[0] - old_pair[1])
-	    
-	    if top == True:
-	        new_term = res * ((rho_norm * rho_conj) ** k) * omit_all(poles, pole)
-	    elif Delta != pole:
-	        new_term = res * ((rho_norm * rho_conj) ** k) / (Delta - pole)
-	    else:
-	        current_series = 1
-	        sign = sympy.Rational(2 - old_series, old_series - current_series)
-		if old_pair[0] == delta:
-		    new_term = sign * res * ((rho_norm * rho_conj) ** k)
-		else:
-		    new_term = sign * res * ((rho_norm * rho_conj) ** k) / (old_pair[0] - old_pair[1])
-	    summation += new_term * meromorphic_block(dim, rho_norm, rho_conj, pole + 2 * k, l + 2 * k, kept_pole_order - 2 * k, False, (Delta, pole), 1)
+class LeadingBlockVector:
+    def __init__(self, dim, derivative_order, l):
+	self.derivative_order = derivative_order
+	self.spin = l
+	self.chunks = []
 	
-	# We don't REALLY skip these parts for k >= nu + l
-	# It's just that whenever this happens, the same pole has shown up in one of the other two sections
-	# The fact that it did will be signalled by a divergence that the program runs into
-	# It will handle this divergence in a way equivalent to keeping this term and taking the limit
-	if k < nu + l or dim % 2 != 0:
+	r = symbols('r')
+	eta = symbols('eta')
+	nu = sympy.Rational(dim, 2) - 1
+	
+	# We cache derivatives as we go
+	# This is because csympy can only compute them one at a time, but it's faster anyway
+	old_expression = leading_block(nu, r, eta, l)
+	    
+	for m in range(0, derivative_order + 1):
+	    chunk = []
+	    for n in range(0, derivative_order - m + 1):
+	        if n == 0 and m == 0:
+		    expression = old_expression
+		elif n == 0:
+		    old_expression = old_expression.diff(eta)
+		    expression = old_expression
+		else:
+		    expression = expression.diff(r)
+		    
+		chunk.append(expression.subs(r, r_cross).subs(eta, 1))
+	    self.chunks.append(DenseMatrix(len(chunk), 1, chunk))
+
+class MeromorphicBlockVector:
+    def __init__(self, dim, Delta, l, derivative_order, kept_pole_order, top):
+        global r_powers
+        self.chunks = []
+	summation = []
+	nu = sympy.Rational(dim, 2) - 1
+        k = 1
+	
+        # Reuse leading block vectors that have already been calculated
+	if len(leading_blocks) == 0:
+	    lb = LeadingBlockVector(dim, derivative_order, l)
+	    leading_blocks.append(lb)
+	else:
+            for lb in leading_blocks:
+                if lb.spin == l and lb.derivative_order == derivative_order:
+	            break
+            if lb.spin != l:
+                lb = LeadingBlockVector(dim, derivative_order, l)
+	        leading_blocks.append(lb)
+        for i in range(0, derivative_order + 1):
+	    summation.append(lb.chunks[i])
+	
+	# Take the same strategy with powers of the R matrix
+	if top == True:
+	    r_powers = []
+	    identity = [0] * ((derivative_order + 1) ** 2)
+	    lower_band = [0] * ((derivative_order + 1) ** 2)
+	
+	    for i in range(0, derivative_order + 1):
+	        identity[i * (derivative_order + 1) + i] = 1
+	    for i in range(1, derivative_order + 1):
+	        lower_band[i * (derivative_order + 1) + i - 1] = i
+		
+	    identity = DenseMatrix(derivative_order + 1, derivative_order + 1, identity)
+	    lower_band = DenseMatrix(derivative_order + 1, derivative_order + 1, lower_band)
+	    r_matrix = identity.mul_scalar(r_cross).add_matrix(lower_band)
+	    r_powers.append(identity)
+	    r_powers.append(r_matrix)
+	
+	# Top says we have not recursed yet and our expression is still expected to have denominators
+        # with the free variable delta. Cancelling them later is slow so we do it now.
+        if top == True:
+            poles = get_poles(dim, l, kept_pole_order)
+	    for p in poles:
+	        for i in range(0, derivative_order + 1):
+	            summation[i] = summation[i].mul_scalar(delta - p)
+	
+        while (2 * k) <= kept_pole_order:
+	    if len(r_powers) < 2 * k + 1:
+	        r_powers.append(r_powers[2 * k - 1].mul_matrix(r_powers[1]))
+		r_powers.append(r_powers[2 * k].mul_matrix(r_powers[1]))
+		
+            res = delta_residue(nu, k, l, 1)
+	    if res != 0:
+	        pole = delta_pole(nu, k, l, 1)
+		new_block = MeromorphicBlockVector(dim, pole + 2 * k, l + 2 * k, derivative_order, kept_pole_order - 2 * k, False)
+		if top == True:
+		    res *= omit_all(poles, pole)
+		else:
+		    res *= sympy.Rational(1, Delta - pole)		
+		for i in range(0, derivative_order + 1):
+		    r_sub = r_powers[2 * k].submatrix(0, derivative_order - i, 0, derivative_order - i)
+		    summation[i] = summation[i].add_matrix(r_sub.mul_matrix(new_block.chunks[i]).mul_scalar(res))
+	    
 	    res = delta_residue(nu, k, l, 2)
 	    if res != 0:
 	        pole = delta_pole(nu, k, l, 2)
-		if old_pair[0] == delta and old_pair[1] in dual_poles and Delta != pole:
-	            res *= (old_pair[0] - old_pair[1])
-		
+		new_block = MeromorphicBlockVector(dim, pole + 2 * k, l, derivative_order, kept_pole_order - 2 * k, False)
 		if top == True:
-	            new_term = res * ((rho_norm * rho_conj) ** k) * omit_all(poles, pole)
-	        else:
-	            new_term = res * ((rho_norm * rho_conj) ** k) / (Delta - pole)
-	        summation += new_term * meromorphic_block(dim, rho_norm, rho_conj, pole + 2 * k, l, kept_pole_order - 2 * k, False, (Delta, pole), 2)
-	
-	if k <= (l / 2):
-	    res = delta_residue(nu, k, l, 3)
-	    if res != 0:
-	        pole = delta_pole(nu, k, l, 3)
-		if old_pair[0] == delta and old_pair[1] in dual_poles and Delta != pole:
-	            res *= (old_pair[0] - old_pair[1])
-		
-	        if top == True:
-	            new_term = res * ((rho_norm * rho_conj) ** k) * omit_all(poles, pole)
-		elif Delta != pole:
-	            new_term = res * ((rho_norm * rho_conj) ** k) / (Delta - pole)
+		    res *= omit_all(poles, pole)
 		else:
-		    current_series = 3
-	            sign = sympy.Rational(2 - old_series, old_series - current_series)
-		    if old_pair[0] == delta:
-		        new_term = sign * res * ((rho_norm * rho_conj) ** k)
+		    res *= sympy.Rational(1, Delta - pole)
+		for i in range(0, derivative_order + 1):
+		    r_sub = r_powers[2 * k].submatrix(0, derivative_order - i, 0, derivative_order - i)
+		    summation[i] = summation[i].add_matrix(r_sub.mul_matrix(new_block.chunks[i]).mul_scalar(res))
+	    
+	    if k <= (l / 2):
+	        res = delta_residue(nu, k, l, 3)
+	        if res != 0:
+		    pole = delta_pole(nu, k, l, 3)
+		    new_block = MeromorphicBlockVector(dim, pole + 2 * k, l - 2 * k, derivative_order, kept_pole_order - 2 * k, False)
+		    if top == True:
+		        res *= omit_all(poles, pole)
 		    else:
-		        new_term = sign * res * ((rho_norm * rho_conj) ** k) / (old_pair[0] - old_pair[1])
-	        summation += new_term * meromorphic_block(dim, rho_norm, rho_conj, pole + 2 * k, l - 2 * k, kept_pole_order - 2 * k, False, (Delta, pole), 3)
+		        res *= sympy.Rational(1, Delta - pole)
+		    for i in range(0, derivative_order + 1):
+		        r_sub = r_powers[2 * k].submatrix(0, derivative_order - i, 0, derivative_order - i)
+		        summation[i] = summation[i].add_matrix(r_sub.mul_matrix(new_block.chunks[i]).mul_scalar(res))
+	    
+	    k += 1
+	
+	# A chunk is a set of r derivatives for one eta derivative
+	# The matrix that should multiply a chunk is just R restricted to the right length
+	for i in range(0, derivative_order + 1):
+	    self.chunks.append(summation[i])
 
-	k += 1
-    return summation
-
-def conformal_block(dim, rho_norm, rho_conj, Delta, l, kept_pole_order):
-    return ((rho_norm * rho_conj) ** (Delta / 2)) * meromorphic_block(dim, rho_norm, rho_conj, Delta, l, kept_pole_order, True, (0, 0), 0)
+class ConformalBlockVector:
+    def __init__(self, dim, l, derivative_order, kept_pole_order):
+        global s_matrix
+	self.chunks = []
+	
+	# Perhaps poorly named, S keeps track of a linear combination of derivatives
+	# We get this by including the essential singularity, then stripping it off again
+	if s_matrix == []:
+	    s_matrix = DenseMatrix(derivative_order + 1, derivative_order + 1, [0] * ((derivative_order + 1) ** 2))
+	    for i in range(0, derivative_order + 1):
+	        new_element = 1
+	        for j in range(i, -1, -1):
+		    s_matrix.set(i, j, new_element)
+		    new_element *= (j / ((i - j + 1) * r_cross)) * (delta - (i - j))
+	
+	meromorphic_block = MeromorphicBlockVector(dim, delta, l, derivative_order, kept_pole_order, True)
+	for i in range(0, derivative_order + 1):
+	    s_sub = s_matrix.submatrix(0, derivative_order - i, 0, derivative_order - i)
+	    self.chunks.append(s_sub.mul_matrix(meromorphic_block.chunks[i]))
 
 class ConformalBlockTable:
     def __init__(self, dim, derivative_order, kept_pole_order, l_max, odd_spins = False):
@@ -216,48 +271,103 @@ class ConformalBlockTable:
 	    step = 1
 	else:
 	    step = 2
+	conformal_blocks = []
 	
-	z = symbols('z')
-	rho_n = function_symbol('rho_n', z_norm)
-	rho_c = function_symbol('rho_c', z_conj)
-	rho = z / (1 + sqrt(1 - z)) ** 2
-	
-	rules = []
-	for i in range(0, derivative_order + 1):
-	    rules.append(rho.subs(z, 0.5))
-	    rho = rho.diff(z)
-	
-	# We cache derivatives as we go
-	# This is because csympy can only compute them one at a time, but it's faster anyway
+	print "Preparing blocks"
 	for l in range(0, l_max + 1, step):
-            print "Spin = " + str(l)
-	    derivatives = []
-	    old_expression = conformal_block(dim, rho_n, rho_c, delta, l, kept_pole_order)
-	    
-	    for m in range(0, derivative_order + 1):
-		for n in range(0, min(((derivative_order + 1) / 2), derivative_order - m) + 1):
-		    # Each loop has one expansion that it can do without
-		    if n == 0 and m == 0:
-		        expression = old_expression
-		    elif n == 0:
-		        old_expression = old_expression.diff(z_norm).expand()
-			expression = old_expression
-		    else:
-		        expression = expression.diff(z_conj).expand()
-		    
-		    deriv = expression * ((rho_n * rho_c) ** (-delta / 2))
-		    for i in range(m, 0, -1):
-		        deriv = deriv.subs(Derivative(rho_n, [z_norm] * i), rules[i])
-		    for j in range(n, 0, -1):
-		        deriv = deriv.subs(Derivative(rho_c, [z_conj] * j), rules[j])
-		    deriv = deriv.subs(rho_n, rules[0]).subs(rho_c, rules[0])
-		    derivatives.append(fudge * deriv.expand())
-		    
-		    # For the 27th element of the list, say what m derivative and what n derivative it corresponds to
-		    if l == 0:
-		        self.m_order.append(m)
-		        self.n_order.append(n)
-	    self.table.append(derivatives)
+	    conformal_blocks.append(ConformalBlockVector(dim, l, derivative_order, kept_pole_order))
+	    self.table.append([])
+	
+	z_norm = symbols('z_norm')
+	z_conj = symbols('z_conj')
+	r = function_symbol('r', z_norm, z_conj)
+	eta = function_symbol('eta', z_norm, z_conj)
+	old_coeff_grid = []
+	
+	rules1 = []
+	rules2 = []
+	old_expression1 = sqrt(z_norm * z_conj) / ((1 + sqrt(1 - z_norm)) * (1 + sqrt(1 - z_conj)))
+	old_expression2 = (sqrt(z_norm / z_conj) * ((1 + sqrt(1 - z_conj)) / (1 + sqrt(1 - z_norm))) + sqrt(z_conj / z_norm) * ((1 + sqrt(1 - z_norm)) / (1 + sqrt(1 - z_conj)))) / 2
+	
+	print "Differentiating radial co-ordinates"
+	for m in range(0, derivative_order + 1):
+	    old_coeff_grid.append([0] * (derivative_order - m + 1))
+	
+	for m in range(0, derivative_order + 1):
+	    for n in range(0, min(((derivative_order + 1) / 2), derivative_order - m) + 1):
+		if n == 0 and m == 0:
+		    expression1 = old_expression1
+		    expression2 = old_expression2
+		elif n == 0:
+		    old_expression1 = old_expression1.diff(z_norm)
+		    old_expression2 = old_expression2.diff(z_norm)
+		    expression1 = old_expression1
+		    expression2 = old_expression2
+		else:
+		    expression1 = expression1.diff(z_conj)
+		    expression2 = expression2.diff(z_conj)
+		
+		rules1.append(expression1.subs(z_norm, z_cross).subs(z_conj, z_cross))
+		rules2.append(expression2.subs(z_norm, z_cross).subs(z_conj, z_cross))
+		self.m_order.append(m)
+		self.n_order.append(n)
+	
+	print "Putting them together"
+	old_coeff_grid[0][0] = 1
+	order = 0
+	
+	for m in range(0, derivative_order + 1):
+	    for n in range(0, min(((derivative_order + 1) / 2), derivative_order - m) + 1):
+	        # Hack implementation of the g(r(z_norm, z_conj), eta(z_norm, z_conj)) chain rule
+	        if n == 0 and m == 0:
+		    coeff_grid = self.deepcopy(old_coeff_grid)
+		elif n == 0:
+		    for i in range(m + n - 1, -1, -1):
+		        for j in range(m + n - i - 1, -1, -1):
+			    coeff = old_coeff_grid[i][j]
+			    if type(coeff) == type(1):
+			        coeff_deriv = 0
+			    else:
+			        coeff_deriv = coeff.diff(z_norm)
+			    old_coeff_grid[i + 1][j] += coeff * r.diff(z_norm)
+			    old_coeff_grid[i][j + 1] += coeff * eta.diff(z_norm)
+			    old_coeff_grid[i][j] = coeff_deriv
+		    coeff_grid = self.deepcopy(old_coeff_grid)
+		else:
+		    for i in range(m + n - 1, -1, -1):
+		        for j in range(m + n - i - 1, -1, -1):
+			    coeff = coeff_grid[i][j]
+			    if type(coeff) == type(1):
+			        coeff_deriv = 0
+			    else:
+			        coeff_deriv = coeff.diff(z_conj)
+			    coeff_grid[i + 1][j] += coeff * r.diff(z_conj)
+			    coeff_grid[i][j + 1] += coeff * eta.diff(z_conj)
+			    coeff_grid[i][j] = coeff_deriv
+		
+		# Replace r and eta derivatives with the rules found above
+		deriv = self.deepcopy(coeff_grid)
+	    	for l in range(order, 0, -1):
+		    for i in range(0, m + n + 1):
+		        for j in range(0, m + n - i + 1):
+			    if type(deriv[i][j]) != type(1):
+		                deriv[i][j] = deriv[i][j].subs(Derivative(r, [z_norm] * self.m_order[l] + [z_conj] * self.n_order[l]), rules1[l])
+		                deriv[i][j] = deriv[i][j].subs(Derivative(eta, [z_norm] * self.m_order[l] + [z_conj] * self.n_order[l]), rules2[l])
+		
+		# Replace conformal block derivatives similarly for each spin
+		for l in range(0, len(conformal_blocks)):
+		    new_deriv = 0
+		    for i in range(0, m + n + 1):
+		        for j in range(0, m + n - i + 1):
+			    new_deriv += deriv[i][j] * conformal_blocks[l].chunks[j].get(i, 0)
+		    self.table[l].append(fudge * new_deriv.expand())
+		order += 1
+	
+    def deepcopy(self, array):
+        ret = []
+	for el in array:
+	    ret.append(list(el))
+	return ret
 
 class ConvolvedBlockTable:
     def __init__(self, block_table):
@@ -270,6 +380,8 @@ class ConvolvedBlockTable:
 	self.table = []
 	self.norm = []
 	
+	z_norm = symbols('z_norm')
+        z_conj = symbols('z_conj')
 	g = function_symbol('g', z_norm, z_conj)
 	f = (((1 - z_norm) * (1 - z_conj)) ** delta_ext) * g
 	
