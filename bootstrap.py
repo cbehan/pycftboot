@@ -11,17 +11,21 @@ import sympy
 
 # A bug sometimes occurs when shifting the variable of a polynomial
 # It is caused by a constant term, so we include an extra monomial and set it to unity at the end
-mpmath.mp.dps = 200
+prec = 660
+mpmath.mp.dps = int((3.0 / 10.0) * prec)
+
 s_matrix = []
 r_powers = []
+dual_poles = []
 leading_blocks = []
-r_cross = eval_mpfr(3 - 2 * sqrt(2), 100)
-z_cross = eval_mpfr(sympy.Rational(1, 2), 100)
+
+rho_cross = 3 - 2 * mpmath.sqrt(2)
+r_cross = eval_mpfr(3 - 2 * sqrt(2), prec)
+z_cross = eval_mpfr(sympy.Rational(1, 2), prec)
+
+fudge = symbols('fudge')
 delta  = symbols('delta')
 delta_ext = symbols('delta_ext')
-fudge = symbols('fudge')
-rho_cross = 3 - 2 * mpmath.sqrt(2)
-dual_poles = []
 
 def get_index(array, element):
     if element in array:
@@ -30,7 +34,7 @@ def get_index(array, element):
         return -1
 
 def shifted_prefactor(poles, base, x, shift):
-    product = mpmath.mpf(1)
+    product = 1
     for p in poles:
         product *= x - (p - shift)
     return (base ** (x + shift)) / product
@@ -514,12 +518,9 @@ class SDP:
     def make_laguerre_points(self, degree):
         ret = []
         for d in range(0, degree + 1):
-	    point = -(mpmath.pi ** 2) * ((4 * d - 1) ** 2) / (64 * (degree + 1) * mpmath.log(rho_cross))
-	    ret.append(point)
+	    point = -(pi ** 2) * ((4 * d - 1) ** 2) / (64 * (degree + 1) * log(r_cross))
+	    ret.append(eval_mpfr(point, prec))
 	return ret
-    
-    def integrand(self, x, pos, shift, poles):
-        return (x ** pos) * shifted_prefactor(poles, rho_cross, x, shift)
     
     def integral(self, pos, shift, poles):
         single_poles = []
@@ -618,20 +619,16 @@ class SDP:
 	        polynomial_node = doc.createElement("polynomial")
 		for d in range(0, len(coeff_list)):
 		    if d == 0:
-		        coeff = eval_double(coeff_list[0])
+		        coeff = eval_mpfr(coeff_list[0], prec)
 		    else:
-		        coeff = eval_double(coeff_list[d].args[0])
+		        coeff = eval_mpfr(coeff_list[d].args[0], prec)
 		    
 		    coeff_node = doc.createElement("coeff")
-		    coeff_node.appendChild(doc.createTextNode(str.format('{0:.200f}', coeff)))
+		    coeff_node.appendChild(doc.createTextNode(coeff.__str__()))
 		    polynomial_node.appendChild(coeff_node)
 		vector_node.appendChild(polynomial_node)
 	    elements_node.appendChild(vector_node)
-	    
-	    # We have now finished using delta_min in csympy
-	    # It's time to convert it to a more precise mpmath type for this part
-	    delta_min = mpmath.mpf(delta_min.__str__())
-	    
+	    	       
 	    print "Getting points"
 	    poles = get_poles(self.dim, spin, self.kept_pole_order)
 	    index = get_index(laguerre_degrees, degree)
@@ -647,22 +644,22 @@ class SDP:
 	        elt_node = doc.createElement("elt")
 		elt_node.appendChild(doc.createTextNode(points[d].__str__()))
 		sample_point_node.appendChild(elt_node)
-		damped_rational = shifted_prefactor(poles, rho_cross, points[d], delta_min)
+		damped_rational = shifted_prefactor(poles, r_cross, points[d], eval_mpfr(delta_min, prec))
 		elt_node = doc.createElement("elt")
 		elt_node.appendChild(doc.createTextNode(damped_rational.__str__()))
 		sample_scaling_node.appendChild(elt_node)
 	    
+	    # We have now finished using delta_min in csympy
+	    # It's time to convert it to a more precise mpmath type for this part
+	    delta_min = mpmath.mpf(delta_min.__str__())
+	    
 	    bands = []
 	    matrix = []
 	    # One place where arbitrary precision really matters
-	    # We numerically integrate to find the moment matrix for now
 	    print "Getting bands"
 	    for d in range(0, 2 * (degree / 2) + 1):
-	        #result1 = mpmath.quad(lambda x: self.integrand(x, d, delta_min, poles), [0, mpmath.inf])
-	        result2 = self.integral(d, delta_min, poles)
-		#print result1
-		#print result2
-		bands.append(result2)
+	        result = self.integral(d, delta_min, poles)
+		bands.append(result)
 	    for r in range(0, (degree / 2) + 1):
 	        new_entries = []
 	        for s in range(0, (degree / 2) + 1):
