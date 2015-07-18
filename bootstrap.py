@@ -137,7 +137,7 @@ class LeadingBlockVector:
 		else:
 		    expression = expression.diff(r)
 		    
-		chunk.append(expression.subs(r, r_cross).subs(eta, 1))
+		chunk.append(expression.subs({r : r_cross, eta : 1}))
 	    self.chunks.append(DenseMatrix(len(chunk), 1, chunk))
 
 class MeromorphicBlockVector:
@@ -355,8 +355,8 @@ class ConformalBlockTable:
 		    expression1 = expression1.diff(z_conj)
 		    expression2 = expression2.diff(z_conj)
 		
-		rules1.append(expression1.subs(z_norm, z_cross).subs(z_conj, z_cross))
-		rules2.append(expression2.subs(z_norm, z_cross).subs(z_conj, z_cross))
+		rules1.append(expression1.subs({z_norm : z_cross, z_conj : z_cross}))
+		rules2.append(expression2.subs({z_norm : z_cross, z_conj : z_cross}))
 		self.m_order.append(m)
 		self.n_order.append(n)
 	
@@ -426,47 +426,47 @@ class ConvolvedBlockTable:
 	self.l_max = block_table.l_max
 	self.odd_spins = block_table.odd_spins
 	self.table = []
-	self.norm = []
+	self.unit = []
 	
 	z_norm = symbols('z_norm')
         z_conj = symbols('z_conj')
 	g = function_symbol('g', z_norm, z_conj)
 	f = (((1 - z_norm) * (1 - z_conj)) ** delta_ext) * g
 	
-	# Same comments apply here
+	derivatives = []
+	old_expression = f
+	
+	for m in range(0, block_table.derivative_order + 1):
+	    for n in range(0, min(m, block_table.derivative_order - m) + 1):
+	        if n == 0 and m == 0:
+	            expression = old_expression
+	        elif n == 0:
+	            old_expression = old_expression.diff(z_norm).expand()
+	    	    expression = old_expression
+		else:
+		    expression = expression.diff(z_conj).expand()
+		    
+		# Skip even derivatives
+		if (m + n) % 2 == 0:
+		    continue
+		
+		deriv = expression / (factorial(m) * factorial(n))
+		derivatives.append(deriv)
+		
+		for i in range(len(block_table.table[0]) - 1, 0, -1):
+		    deriv = deriv.subs(Derivative(g, [z_norm] * block_table.m_order[i] + [z_conj] * block_table.n_order[i]), 0)
+		deriv = deriv.subs(g, 1)
+		self.unit.append(2 * deriv.subs({z_norm : z_cross, z_conj : z_cross}))
+	
 	for l in range(0, len(block_table.table)):
-	    derivatives = []
-	    old_expression = f
-	    
-	    for m in range(0, block_table.derivative_order + 1):
-		for n in range(0, min(m, block_table.derivative_order - m) + 1):
-		    if n == 0 and m == 0:
-		        expression = old_expression
-		    elif n == 0:
-		        old_expression = old_expression.diff(z_norm).expand()
-			expression = old_expression
-		    else:
-		        expression = expression.diff(z_conj).expand()
-		    
-		    # Skip even derivatives
-		    if (m + n) % 2 == 0:
-		        continue
-		    
-		    # Now we replace abstract derivatives with the expressions in the unconvolved table
-		    deriv = expression / (factorial(m) * factorial(n))
-		    for i in range(len(block_table.table[0]) - 1, 0, -1):
-		        deriv = deriv.subs(Derivative(g, [z_norm] * block_table.m_order[i] + [z_conj] * block_table.n_order[i]), block_table.table[l][i])
-		    deriv = deriv.subs(g, block_table.table[l][0])
-		    derivatives.append(2 * deriv.subs({z_norm : 0.5, z_conj : 0.5}))
-		    
-		    # Do this once for the unit operator too
-		    if l == 0:
-		        deriv = expression / (factorial(m) * factorial(n))
-			for i in range(len(block_table.table[0]) - 1, 0, -1):
-		            deriv = deriv.subs(Derivative(g, [z_norm] * block_table.m_order[i] + [z_conj] * block_table.n_order[i]), 0)
-			deriv = deriv.subs(g, 1)
-			self.norm.append(2 * deriv.subs({z_norm : 0.5, z_conj : 0.5}))
-	    self.table.append(derivatives)
+	    new_derivs = []
+	    for i in range(0, len(derivatives)):
+	        deriv = derivatives[i]
+	        for j in range(len(block_table.table[0]) - 1, 0, -1):
+		    deriv = deriv.subs(Derivative(g, [z_norm] * block_table.m_order[j] + [z_conj] * block_table.n_order[j]), block_table.table[l][j])
+		deriv = deriv.subs(g, block_table.table[l][0])
+		new_derivs.append(2 * deriv.subs({z_norm : z_cross, z_conj : z_cross}))
+	    self.table.append(new_derivs)
 
 class SDP:
     def __init__(self, conv_block_table, dim_ext):
@@ -487,7 +487,7 @@ class SDP:
 	    for i in range(0, len(conv_block_table.table[l])):
 	        derivatives.append(conv_block_table.table[l][i].subs(delta_ext, dim_ext))
 		if l == 0:
-		    unit = conv_block_table.norm[i].subs(delta_ext, dim_ext)
+		    unit = conv_block_table.unit[i].subs(delta_ext, dim_ext)
 		    if abs(unit) > abs(max_unit):
 		        max_unit = unit
 			max_index = i
