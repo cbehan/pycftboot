@@ -141,8 +141,9 @@ class LeadingBlockVector:
 	    self.chunks.append(DenseMatrix(len(chunk), 1, chunk))
 
 class MeromorphicBlockVector:
-    def __init__(self, dim, Delta, l, derivative_order, kept_pole_order, top):
+    def __init__(self, dim, Delta, l, derivative_order, kept_pole_order, top, old_pair, old_series):
         global r_powers
+	global dual_poles
         self.chunks = []
 	summation = []
 	nu = sympy.Rational(dim, 2) - 1
@@ -186,6 +187,22 @@ class MeromorphicBlockVector:
 	    for p in poles:
 	        for i in range(0, derivative_order + 1):
 	            summation[i] = summation[i].mul_scalar(delta - p)
+	elif old_pair[0] == delta and old_pair[1] in dual_poles:
+	    for i in range(0, derivative_order + 1):
+	        summation[i] = summation[i].mul_scalar(old_pair[0] - old_pair[1])
+	
+	if dim % 2 != 0:
+	    dual_poles = []
+	
+	# Preparing for infinite residues that may be encountered soon
+        if top == True and dim % 2 == 0:
+	    dual_poles = []
+	    while (2 * k) <= kept_pole_order:
+	        if k >= nu + l and delta_residue(nu, k, l, 2) != 0:
+	            dual_poles.append(delta_pole(nu, k, l, 2))
+		    dual_poles.append(delta_pole(nu, k, l, 2))
+	        k += 1
+	    k = 1
 	
         while (2 * k) <= kept_pole_order:
 	    if len(r_powers) < 2 * k + 1:
@@ -195,36 +212,67 @@ class MeromorphicBlockVector:
             res = delta_residue(nu, k, l, 1)
 	    if res != 0:
 	        pole = delta_pole(nu, k, l, 1)
-		new_block = MeromorphicBlockVector(dim, pole + 2 * k, l + 2 * k, derivative_order, kept_pole_order - 2 * k, False)
+		new_block = MeromorphicBlockVector(dim, pole + 2 * k, l + 2 * k, derivative_order, kept_pole_order - 2 * k, False, (Delta, pole), 1)
+		if old_pair[0] == delta and old_pair[1] in dual_poles and Delta != pole:
+	            res *= (old_pair[0] - old_pair[1])
+		
 		if top == True:
 		    res *= omit_all(poles, pole)
+		elif Delta != pole:
+		    res /= Delta - pole
 		else:
-		    res *= sympy.Rational(1, Delta - pole)		
+		    current_series = 1
+		    sign = sympy.Rational(2 - old_series, old_series - current_series)
+		    if old_pair[0] == delta:
+		        res *= sign
+		    else:
+		        res /= (old_pair[0] - old_pair[1]) / sign
+				
 		for i in range(0, derivative_order + 1):
 		    r_sub = r_powers[2 * k].submatrix(0, derivative_order - i, 0, derivative_order - i)
 		    summation[i] = summation[i].add_matrix(r_sub.mul_matrix(new_block.chunks[i]).mul_scalar(res))
 	    
-	    res = delta_residue(nu, k, l, 2)
-	    if res != 0:
-	        pole = delta_pole(nu, k, l, 2)
-		new_block = MeromorphicBlockVector(dim, pole + 2 * k, l, derivative_order, kept_pole_order - 2 * k, False)
-		if top == True:
-		    res *= omit_all(poles, pole)
-		else:
-		    res *= sympy.Rational(1, Delta - pole)
-		for i in range(0, derivative_order + 1):
-		    r_sub = r_powers[2 * k].submatrix(0, derivative_order - i, 0, derivative_order - i)
-		    summation[i] = summation[i].add_matrix(r_sub.mul_matrix(new_block.chunks[i]).mul_scalar(res))
+	    # We don't REALLY skip these parts for k >= nu + l
+	    # It's just that whenever this happens, the same pole has shown up in one of the other two sections
+	    # The fact that it did will be signalled by a divergence that the program runs into
+	    # It will handle this divergence in a way equivalent to keeping this term and taking the limit
+	    if k < nu + l or dim % 2 != 0:
+	        res = delta_residue(nu, k, l, 2)
+	        if res != 0:
+	            pole = delta_pole(nu, k, l, 2)
+		    new_block = MeromorphicBlockVector(dim, pole + 2 * k, l, derivative_order, kept_pole_order - 2 * k, False, (Delta, pole), 2)
+		    if old_pair[0] == delta and old_pair[1] in dual_poles and Delta != pole:
+	                res *= (old_pair[0] - old_pair[1])
+		    
+		    if top == True:
+		        res *= omit_all(poles, pole)
+		    else:
+		        res /= Delta - pole
+		    
+		    for i in range(0, derivative_order + 1):
+		        r_sub = r_powers[2 * k].submatrix(0, derivative_order - i, 0, derivative_order - i)
+		        summation[i] = summation[i].add_matrix(r_sub.mul_matrix(new_block.chunks[i]).mul_scalar(res))
 	    
 	    if k <= (l / 2):
 	        res = delta_residue(nu, k, l, 3)
 	        if res != 0:
 		    pole = delta_pole(nu, k, l, 3)
-		    new_block = MeromorphicBlockVector(dim, pole + 2 * k, l - 2 * k, derivative_order, kept_pole_order - 2 * k, False)
+		    new_block = MeromorphicBlockVector(dim, pole + 2 * k, l - 2 * k, derivative_order, kept_pole_order - 2 * k, False, (Delta, pole), 3)
+		    if old_pair[0] == delta and old_pair[1] in dual_poles and Delta != pole:
+	                res *= (old_pair[0] - old_pair[1])
+		    
 		    if top == True:
 		        res *= omit_all(poles, pole)
+		    elif Delta != pole:
+		        res /= Delta - pole
 		    else:
-		        res *= sympy.Rational(1, Delta - pole)
+		        current_series = 3
+			sign = sympy.Rational(2 - old_series, old_series - current_series)
+			if old_pair[0] == delta:
+		            res *= sign
+		        else:
+		            res /= (old_pair[0] - old_pair[1]) / sign
+		    
 		    for i in range(0, derivative_order + 1):
 		        r_sub = r_powers[2 * k].submatrix(0, derivative_order - i, 0, derivative_order - i)
 		        summation[i] = summation[i].add_matrix(r_sub.mul_matrix(new_block.chunks[i]).mul_scalar(res))
@@ -251,7 +299,7 @@ class ConformalBlockVector:
 		    s_matrix.set(i, j, new_element)
 		    new_element *= (j / ((i - j + 1) * r_cross)) * (delta - (i - j))
 	
-	meromorphic_block = MeromorphicBlockVector(dim, delta, l, derivative_order, kept_pole_order, True)
+	meromorphic_block = MeromorphicBlockVector(dim, delta, l, derivative_order, kept_pole_order, True, (0, 0), 0)
 	for i in range(0, derivative_order + 1):
 	    s_sub = s_matrix.submatrix(0, derivative_order - i, 0, derivative_order - i)
 	    self.chunks.append(s_sub.mul_matrix(meromorphic_block.chunks[i]))
