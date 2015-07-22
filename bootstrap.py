@@ -9,8 +9,6 @@ from symengine import *
 from symengine.lib.symengine_wrapper import *
 import sympy
 
-# A bug sometimes occurs when shifting the variable of a polynomial
-# It is caused by a constant term, so we include an extra monomial and set it to unity at the end
 prec = 660
 mpmath.mp.dps = int((3.0 / 10.0) * prec)
 
@@ -23,7 +21,6 @@ rho_cross = 3 - 2 * mpmath.sqrt(2)
 r_cross = eval_mpfr(3 - 2 * sqrt(2), prec)
 z_cross = eval_mpfr(sympy.Rational(1, 2), prec)
 
-fudge = symbols('fudge')
 delta  = symbols('delta')
 delta_ext = symbols('delta_ext')
 
@@ -412,7 +409,7 @@ class ConformalBlockTable:
 		    for i in range(0, m + n + 1):
 		        for j in range(0, m + n - i + 1):
 			    new_deriv += deriv[i][j] * conformal_blocks[l].chunks[j].get(i, 0)
-		    self.table[l].append(fudge * new_deriv.expand())
+		    self.table[l].append(new_deriv.expand())
 		order += 1
 	
     def deepcopy(self, array):
@@ -612,7 +609,6 @@ class SDP:
 	        expression = self.table[j][n].expand()
 		# Impose unitarity bounds and the specified gap
 		expression = expression.subs(delta, delta + delta_min).expand()
-		expression = expression.subs(fudge, 1).expand()
 		coeff_list = sorted(expression.args, key = self.extract_power)
 		degree = max(degree, len(coeff_list) - 1)
 		
