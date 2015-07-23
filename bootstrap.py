@@ -710,3 +710,24 @@ class SDP:
 	        return self.bisect(lower, test, threshold, spin)
 	    else:
 	        return self.bisect(test, upper, threshold, spin)
+    
+    def opemax(self, dimension, spin):
+        if self.odd_spins:
+	    j = spin
+	else:
+	    j = spin / 2
+	
+	norm = []
+	for i in range(0, len(self.table[j])):
+	    norm.append(self.table[j][i].subs(delta, dimension))
+	
+	# Impose no gap
+	self.write_xml(self.dim, 2, self.unit, norm)
+	os.spawnlp(os.P_WAIT, "/usr/bin/sdpb", "sdpb", "-s", "mySDP.xml", "--noFinalCheckpoint")
+	out_file = open("mySDP.out", 'r')
+	out_file.next()
+	primal_line = out_file.next()
+	out_file.close()
+	
+	primal_value = primal_line.partition(" = ")[-1][:-2]
+	return float(primal_value)
