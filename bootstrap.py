@@ -477,30 +477,30 @@ class SDP:
 	self.kept_pole_order = conv_block_table.kept_pole_order
 	self.l_max = conv_block_table.l_max
 	self.odd_spins = conv_block_table.odd_spins
-	self.norm = []
+	self.unit = []
 	self.table = []
 	
-	max_index = 0
-	max_unit = 0
+	for i in range(0, len(conv_block_table.table[0])):
+	    unit = conv_block_table.unit[i].subs(delta_ext, dim_ext)
+	    self.unit.append(unit)
 
 	for l in range(0, len(conv_block_table.table)):
 	    derivatives = []
 	    for i in range(0, len(conv_block_table.table[l])):
 	        derivatives.append(conv_block_table.table[l][i].subs(delta_ext, dim_ext))
-		if l == 0:
-		    unit = conv_block_table.unit[i].subs(delta_ext, dim_ext)
-		    if abs(unit) > abs(max_unit):
-		        max_unit = unit
-			max_index = i
-		    self.norm.append(unit)
 	    self.table.append(derivatives)
+    
+    # Translate between the mathematica definition and the bootstrap definition of SDP
+    def reshuffle_with_normalization(self, vector, norm):
+        max_index = norm.index(max(norm, key = abs))
+	const = vector[max_index] / norm[max_index]
+	ret = []
 	
-	# Translate between the mathematica definition and the bootstrap definition of SDP
-	for l in range(0, len(conv_block_table.table)):
-	    const = self.table[l][max_index] / self.norm[max_index]
-	    for i in range(0, len(self.table[l])):
-	        self.table[l][i] -= const * self.norm[i]
-	    self.table[l] = [const] + self.table[l][:max_index] + self.table[l][max_index + 1:]
+	for i in range(0, len(norm)):
+	    ret.append(vector[i] - const * norm[i])
+	
+	ret = [const] + ret[:max_index] + ret[max_index + 1:]
+	return ret
     
     # Polynomials in csympy are not sorted
     # This determines sorting order from the (coefficient, (delta, exponent)) representation
@@ -563,7 +563,8 @@ class SDP:
 	
 	return (rho_cross ** shift) * ret
     
-    def write_xml(self, gap, gapped_spin):
+    def write_xml(self, gap, gapped_spin, obj, norm):
+        obj = self.reshuffle_with_normalization(obj, norm)
         laguerre_points = []
 	laguerre_degrees = []
 	
@@ -577,9 +578,9 @@ class SDP:
 	root_node.appendChild(matrices_node)
 	
 	# Here, we use indices that match the SDPB specification
-	for n in range(0, len(self.table[0])):
+	for n in range(0, len(obj)):
 	    elt_node = doc.createElement("elt")
-	    elt_node.appendChild(doc.createTextNode("0"))
+	    elt_node.appendChild(doc.createTextNode(obj[n].__str__()))
 	    objective_node.appendChild(elt_node)
 	
 	for j in range(0, len(self.table)):
@@ -604,9 +605,11 @@ class SDP:
 	        delta_min = sympy.Rational(self.dim, 2) - 1
 	    else:
 	        delta_min = self.dim + spin - 2
+	    polynomial_vector = self.reshuffle_with_normalization(self.table[j], norm)
+	    
 	    vector_node = doc.createElement("polynomialVector")
-	    for n in range(0, len(self.table[j])):
-	        expression = self.table[j][n].expand()
+	    for n in range(0, len(polynomial_vector)):
+	        expression = polynomial_vector[n].expand()
 		# Impose unitarity bounds and the specified gap
 		expression = expression.subs(delta, delta + delta_min).expand()
 		coeff_list = sorted(expression.args, key = self.extract_power)
@@ -694,7 +697,8 @@ class SDP:
 	    return upper
 	else:
 	    print "Trying " + str(test)
-	    self.write_xml(test, spin)
+	    obj = [0.0] * len(self.table[0])
+	    self.write_xml(test, spin, obj, self.unit)
 	    os.spawnlp(os.P_WAIT, "/usr/bin/sdpb", "sdpb", "-s", "mySDP.xml", "--findPrimalFeasible", "--findDualFeasible", "--noFinalCheckpoint")
 	    out_file = open("mySDP.out", 'r')
 	    terminate_line = out_file.next()
