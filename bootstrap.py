@@ -492,7 +492,8 @@ class SDP:
     
     # Translate between the mathematica definition and the bootstrap definition of SDP
     def reshuffle_with_normalization(self, vector, norm):
-        max_index = norm.index(max(norm, key = abs))
+        max_index = 0
+	#max_index = norm.index(max(norm, key = abs))
 	const = vector[max_index] / norm[max_index]
 	ret = []
 	
