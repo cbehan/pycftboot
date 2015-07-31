@@ -305,6 +305,11 @@ class ConformalBlockVector:
 	    s_sub = s_matrix.submatrix(0, derivative_order - i, 0, derivative_order - i)
 	    self.chunks.append(s_sub.mul_matrix(meromorphic_block.chunks[i]))
 
+class SDPVector:
+    def __init__(self, derivatives, l):
+        self.vector = derivatives
+	self.spin = l
+
 class ConformalBlockTable:
     def __init__(self, dim, derivative_order, kept_pole_order, l_max, odd_spins = False):
 	self.dim = dim
@@ -492,10 +497,15 @@ class SDP:
 	    self.unit.append(unit)
 
 	for l in range(0, len(conv_block_table.table)):
+	    if self.odd_spins:
+	        spin = l
+	    else:
+	        spin = 2 * l
+	    
 	    derivatives = []
 	    for i in range(0, len(conv_block_table.table[l])):
 	        derivatives.append(conv_block_table.table[l][i].subs(delta_ext, dim_ext))
-	    self.table.append(derivatives)
+	    self.table.append(SDPVector(derivatives, spin))
     
     # Translate between the mathematica definition and the bootstrap definition of SDP
     def reshuffle_with_normalization(self, vector, norm):
@@ -592,10 +602,8 @@ class SDP:
 	    objective_node.appendChild(elt_node)
 	
 	for j in range(0, len(self.table)):
-	    if self.odd_spins:
-	        spin = j
-	    else:
-	        spin = 2 * j
+	    spin = self.table[j].spin
+	    
 	    matrix_node = doc.createElement("polynomialVectorMatrix")
 	    rows_node = doc.createElement("rows")
 	    cols_node = doc.createElement("cols")
@@ -613,14 +621,18 @@ class SDP:
 	        delta_min = sympy.Rational(self.dim, 2) - 1
 	    else:
 	        delta_min = self.dim + spin - 2
-	    polynomial_vector = self.reshuffle_with_normalization(self.table[j], norm)
+	    polynomial_vector = self.reshuffle_with_normalization(self.table[j].vector, norm)
 	    
 	    vector_node = doc.createElement("polynomialVector")
 	    for n in range(0, len(polynomial_vector)):
 	        expression = polynomial_vector[n].expand()
 		# Impose unitarity bounds and the specified gap
 		expression = expression.subs(delta, delta + delta_min).expand()
-		coeff_list = sorted(expression.args, key = self.extract_power)
+		
+		if type(expression) == type(eval_mpfr(1, 10)):
+		    coeff_list = [expression]
+		else:
+		    coeff_list = sorted(expression.args, key = self.extract_power)
 		degree = max(degree, len(coeff_list) - 1)
 		
 	        polynomial_node = doc.createElement("polynomial")
@@ -705,7 +717,7 @@ class SDP:
 	    return upper
 	else:
 	    print "Trying " + str(test)
-	    obj = [0.0] * len(self.table[0])
+	    obj = [0.0] * len(self.table[0].vector)
 	    self.write_xml(test, spin, obj, self.unit)
 	    os.spawnlp(os.P_WAIT, "/usr/bin/sdpb", "sdpb", "-s", "mySDP.xml", "--findPrimalFeasible", "--findDualFeasible", "--noFinalCheckpoint")
 	    out_file = open("mySDP.out", 'r')
@@ -726,7 +738,7 @@ class SDP:
 	
 	norm = []
 	for i in range(0, len(self.table[j])):
-	    norm.append(self.table[j][i].subs(delta, dimension))
+	    norm.append(self.table[j].vector[i].subs(delta, dimension))
 	
 	# Impose no gap
 	self.write_xml(self.dim, 2, self.unit, norm)
