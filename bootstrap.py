@@ -419,15 +419,22 @@ class ConformalBlockTable:
 	return ret
 
 class ConvolvedBlockTable:
-    def __init__(self, block_table):
+    def __init__(self, block_table, odd_spins = True):
         # Copying everything but the unconvolved table is fine from a memory standpoint
         self.dim = block_table.dim
 	self.derivative_order = block_table.derivative_order
 	self.kept_pole_order = block_table.kept_pole_order
 	self.l_max = block_table.l_max
-	self.odd_spins = block_table.odd_spins
 	self.table = []
 	self.unit = []
+	
+	# We can restrict to even spin when the provided table has odd spin but not vice-versa
+	if odd_spins == False and block_table.odd_spins == True:
+	    self.odd_spins = False
+	    step = 2
+	else:
+	    self.odd_spins = block_table.odd_spins
+	    step = 1
 	
 	z_norm = symbols('z_norm')
         z_conj = symbols('z_conj')
@@ -459,7 +466,7 @@ class ConvolvedBlockTable:
 		deriv = deriv.subs(g, 1)
 		self.unit.append(2 * deriv.subs({z_norm : z_cross, z_conj : z_cross}))
 	
-	for l in range(0, len(block_table.table)):
+	for l in range(0, len(block_table.table), step):
 	    new_derivs = []
 	    for i in range(0, len(derivatives)):
 	        deriv = derivatives[i]
