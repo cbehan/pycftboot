@@ -512,6 +512,9 @@ class SDP:
 	self.bounds = [0.0] * len(self.table)
 	self.set_bound()
     
+    def add_point(self, spin, dimension):
+        self.points.append((spin, dimension))
+    
     # Defaults to unitarity bounds if there are missing arguments
     def set_bound(self, gapped_spin = -1, delta_min = -1):
         if gapped_spin == -1:
@@ -613,6 +616,21 @@ class SDP:
         obj = self.reshuffle_with_normalization(obj, norm)
         laguerre_points = []
 	laguerre_degrees = []
+	extra_vectors = []
+	
+	# Handle discretely added points
+	print "Adding isolated points"
+	for p in self.points:
+	    new_vector = []
+	    if self.odd_spins:
+	        l = p[0]
+	    else:
+	        l = p[0] / 2
+	    
+	    for i in range(0, len(self.table[0].vector)):
+	        new_vector.append(self.table[l].vector[i].subs(delta, p[1]))
+	    extra_vectors.append(SDPVector(new_vector, p[0]))
+	self.table += extra_vectors
 	
 	doc = xml.dom.minidom.Document()
 	root_node = doc.createElement("sdp")
@@ -731,7 +749,8 @@ class SDP:
 	    matrix_node.appendChild(sample_scaling_node)
 	    matrix_node.appendChild(bilinear_basis_node)
 	    matrices_node.appendChild(matrix_node)
-	    
+	
+	self.table = self.table[:len(self.bounds)]
 	xml_file = open("mySDP.xml", 'wb')
 	doc.writexml(xml_file, addindent = "    ", newl = '\n')
 	xml_file.close()
