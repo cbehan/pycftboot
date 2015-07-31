@@ -489,8 +489,10 @@ class SDP:
 	self.kept_pole_order = conv_block_table.kept_pole_order
 	self.l_max = conv_block_table.l_max
 	self.odd_spins = conv_block_table.odd_spins
+	
 	self.unit = []
 	self.table = []
+	self.points = []
 	
 	for i in range(0, len(conv_block_table.table[0])):
 	    unit = conv_block_table.unit[i].subs(delta_ext, dim_ext)
@@ -506,6 +508,32 @@ class SDP:
 	    for i in range(0, len(conv_block_table.table[l])):
 	        derivatives.append(conv_block_table.table[l][i].subs(delta_ext, dim_ext))
 	    self.table.append(SDPVector(derivatives, spin))
+	
+	self.bounds = [0.0] * len(self.table)
+	self.set_bound()
+    
+    # Defaults to unitarity bounds if there are missing arguments
+    def set_bound(self, gapped_spin = -1, delta_min = -1):
+        if gapped_spin == -1:
+	    self.bounds[0] = sympy.Rational(self.dim, 2) - 1
+	    for l in range(1, len(self.bounds)):
+	        if self.odd_spins:
+		    spin = l
+		else:
+		    spin = 2 * l
+	        self.bounds[l] = self.dim + spin - 2
+	else:
+	    if self.odd_spins:
+	        l = gapped_spin
+	    else:
+	        l = gapped_spin / 2
+	    
+	    if delta_min == -1 and l == 0:
+	        self.bounds[0] = sympy.Rational(self.dim, 2) - 1
+	    elif delta_min == -1:
+	        self.bounds[l] = self.dim + gapped_spin - 2
+	    else:
+	        self.bounds[l] = delta_min
     
     # Translate between the mathematica definition and the bootstrap definition of SDP
     def reshuffle_with_normalization(self, vector, norm):
@@ -581,7 +609,7 @@ class SDP:
 	
 	return (rho_cross ** shift) * ret
     
-    def write_xml(self, gap, gapped_spin, obj, norm):
+    def write_xml(self, obj, norm):
         obj = self.reshuffle_with_normalization(obj, norm)
         laguerre_points = []
 	laguerre_degrees = []
@@ -615,12 +643,10 @@ class SDP:
 	    cols_node.appendChild(doc.createTextNode("1"))
 	    
 	    degree = 0
-	    if spin == gapped_spin:
-	        delta_min = gap
-	    elif spin == 0:
-	        delta_min = sympy.Rational(self.dim, 2) - 1
+	    if j >= len(self.bounds):
+	        delta_min = 0
 	    else:
-	        delta_min = self.dim + spin - 2
+	        delta_min = self.bounds[j]
 	    polynomial_vector = self.reshuffle_with_normalization(self.table[j].vector, norm)
 	    
 	    vector_node = doc.createElement("polynomialVector")
@@ -718,7 +744,8 @@ class SDP:
 	else:
 	    print "Trying " + str(test)
 	    obj = [0.0] * len(self.table[0].vector)
-	    self.write_xml(test, spin, obj, self.unit)
+	    self.set_bound(spin, test)
+	    self.write_xml(obj, self.unit)
 	    os.spawnlp(os.P_WAIT, "/usr/bin/sdpb", "sdpb", "-s", "mySDP.xml", "--findPrimalFeasible", "--findDualFeasible", "--noFinalCheckpoint")
 	    out_file = open("mySDP.out", 'r')
 	    terminate_line = out_file.next()
@@ -741,7 +768,7 @@ class SDP:
 	    norm.append(self.table[j].vector[i].subs(delta, dimension))
 	
 	# Impose no gap
-	self.write_xml(self.dim, 2, self.unit, norm)
+	self.write_xml(self.unit, norm)
 	os.spawnlp(os.P_WAIT, "/usr/bin/sdpb", "sdpb", "-s", "mySDP.xml", "--noFinalCheckpoint")
 	out_file = open("mySDP.out", 'r')
 	out_file.next()
