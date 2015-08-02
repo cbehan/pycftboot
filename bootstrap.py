@@ -24,18 +24,6 @@ z_cross = eval_mpfr(sympy.Rational(1, 2), prec)
 delta  = symbols('delta')
 delta_ext = symbols('delta_ext')
 
-def get_index(array, element):
-    if element in array:
-        return array.index(element)
-    else:
-        return -1
-
-def shifted_prefactor(poles, base, x, shift):
-    product = 1
-    for p in poles:
-        product *= x - (p - shift)
-    return (base ** (x + shift)) / product
-
 def delta_pole(nu, k, l, series):
     if series == 1:
         return 1 - l - 2 * k
@@ -78,27 +66,6 @@ def get_poles(dim, l, kept_pole_order):
 
     return ret
 
-def nice_poles(dim, l, kept_pole_order):
-    nu = sympy.Rational(dim, 2) - 1
-
-    k = 1
-    ret = []
-    while (2 * k) <= kept_pole_order:
-        if delta_residue(nu, k, l, 1) != 0:
-	    ret.append(sympy.Rational(delta_pole(nu, k, l, 1), 1).evalf())
-	    
-	# Nonzero but it might be infinite
-	if delta_residue(nu, k, l, 2) != 0:
-	    ret.append(sympy.Rational(delta_pole(nu, k, l, 2), 1).evalf())
-	    
-	if k <= (l / 2):
-	    if delta_residue(nu, k, l, 3) != 0:
-	        ret.append(sympy.Rational(delta_pole(nu, k, l, 3), 1).evalf())
-
-	k += 1
-
-    return ret
-
 def omit_all(poles, special_pole):
     expression = 1
     for p in poles:
@@ -115,7 +82,6 @@ def leading_block(nu, R, Eta, l):
 
 class LeadingBlockVector:
     def __init__(self, dim, derivative_order, l):
-	self.derivative_order = derivative_order
 	self.spin = l
 	self.chunks = []
 	
@@ -145,6 +111,7 @@ class MeromorphicBlockVector:
     def __init__(self, dim, Delta, l, derivative_order, kept_pole_order, top, old_pair, old_series):
         global r_powers
 	global dual_poles
+	self.spin = l
         self.chunks = []
 	summation = []
 	nu = sympy.Rational(dim, 2) - 1
@@ -288,6 +255,7 @@ class MeromorphicBlockVector:
 class ConformalBlockVector:
     def __init__(self, dim, l, derivative_order, kept_pole_order):
         global s_matrix
+	self.spin = l
 	self.chunks = []
 	
 	# Perhaps poorly named, S keeps track of a linear combination of derivatives
@@ -551,6 +519,12 @@ class SDP:
 	ret = [const] + ret[:max_index] + ret[max_index + 1:]
 	return ret
     
+    def get_index(self, array, element):
+        if element in array:
+            return array.index(element)
+        else:
+            return -1
+    
     # Polynomials in csympy are not sorted
     # This determines sorting order from the (coefficient, (delta, exponent)) representation
     def extract_power(self, term):
@@ -567,6 +541,12 @@ class SDP:
 	    point = -(pi ** 2) * ((4 * d - 1) ** 2) / (64 * (degree + 1) * log(r_cross))
 	    ret.append(eval_mpfr(point, prec))
 	return ret
+
+    def shifted_prefactor(self, poles, base, x, shift):
+        product = 1
+        for p in poles:
+            product *= x - (p - shift)
+        return (base ** (x + shift)) / product
     
     def integral(self, pos, shift, poles):
         single_poles = []
@@ -694,7 +674,7 @@ class SDP:
 	    	       
 	    print "Getting points"
 	    poles = get_poles(self.dim, spin, self.kept_pole_order)
-	    index = get_index(laguerre_degrees, degree)
+	    index = self.get_index(laguerre_degrees, degree)
 	    if index == -1:
 	        points = self.make_laguerre_points(degree)
 		laguerre_points.append(points)
@@ -707,7 +687,7 @@ class SDP:
 	        elt_node = doc.createElement("elt")
 		elt_node.appendChild(doc.createTextNode(points[d].__str__()))
 		sample_point_node.appendChild(elt_node)
-		damped_rational = shifted_prefactor(poles, r_cross, points[d], eval_mpfr(delta_min, prec))
+		damped_rational = self.shifted_prefactor(poles, r_cross, points[d], eval_mpfr(delta_min, prec))
 		elt_node = doc.createElement("elt")
 		elt_node.appendChild(doc.createTextNode(damped_rational.__str__()))
 		sample_scaling_node.appendChild(elt_node)
