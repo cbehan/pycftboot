@@ -278,7 +278,7 @@ class SDPVector:
 	self.spin = l
 
 class ConformalBlockTable:
-    def __init__(self, dim, derivative_order, kept_pole_order, l_max, odd_spins = False):
+    def __init__(self, dim, derivative_order, kept_pole_order, l_max, odd_spins = False, name = None):
 	self.dim = dim
 	self.derivative_order = derivative_order
 	self.kept_pole_order = kept_pole_order
@@ -293,6 +293,17 @@ class ConformalBlockTable:
 	else:
 	    step = 2
 	conformal_blocks = []
+	
+	if name != None:
+	    num_derivs = ((derivative_order + 3) / 2) * (derivative_order + ((3 - ((derivative_order + 3) / 2)) / 2))
+	    
+	    for l in range(0, l_max + 1, step):
+	        self.table.append([0.0] * num_derivs)
+	    
+	    dump_file = open(name, 'r')
+	    command = dump_file.read()
+	    exec command
+	    return
 	
 	print "Preparing blocks"
 	for l in range(0, l_max + 1, step):
@@ -383,7 +394,24 @@ class ConformalBlockTable:
 			    new_deriv += deriv[i][j] * conformal_blocks[l].chunks[j].get(i, 0)
 		    self.table[l].append(new_deriv.expand())
 		order += 1
+    
+    def dump(self, name):
+        dump_file = open(name, 'w')
 	
+	dump_file.write("self.dim = " + self.dim.__str__() + "\n")
+	dump_file.write("self.derivative_order = " + self.derivative_order.__str__() + "\n")
+	dump_file.write("self.kept_pole_order = " + self.kept_pole_order.__str__() + "\n")
+	dump_file.write("self.l_max = " + self.l_max.__str__() + "\n")
+	dump_file.write("self.odd_spins = " + self.odd_spins.__str__() + "\n")
+	dump_file.write("self.m_order = " + self.m_order.__str__() + "\n")
+	dump_file.write("self.n_order = " + self.n_order.__str__() + "\n")
+	
+        for l in range(0, len(self.table)):
+	    for i in range(0, len(self.table[0])):
+	        dump_file.write("self.table[" + l.__str__() + "][" + i.__str__() + "] = " + self.table[l][i].__str__() + "\n")
+	
+	dump_file.close()
+    
     def deepcopy(self, array):
         ret = []
 	for el in array:
