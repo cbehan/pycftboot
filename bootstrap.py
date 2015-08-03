@@ -83,6 +83,7 @@ def leading_block(nu, R, Eta, l):
 class LeadingBlockVector:
     def __init__(self, dim, derivative_order, l):
 	self.spin = l
+	self.derivative_order = derivative_order
 	self.chunks = []
 	
 	r = symbols('r')
@@ -111,7 +112,6 @@ class MeromorphicBlockVector:
     def __init__(self, dim, Delta, l, derivative_order, kept_pole_order, top, old_pair, old_series):
         global r_powers
 	global dual_poles
-	self.spin = l
         self.chunks = []
 	summation = []
 	nu = sympy.Rational(dim, 2) - 1
@@ -255,7 +255,6 @@ class MeromorphicBlockVector:
 class ConformalBlockVector:
     def __init__(self, dim, l, derivative_order, kept_pole_order):
         global s_matrix
-	self.spin = l
 	self.chunks = []
 	
 	# Perhaps poorly named, S keeps track of a linear combination of derivatives
