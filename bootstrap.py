@@ -1,6 +1,7 @@
 #!/usr/bin/env python2
 import xml.dom.minidom
 import mpmath
+import re
 import os
 
 # Use regular sympy sparingly because it is slow
@@ -404,7 +405,9 @@ class ConformalBlockTable:
         for l in range(0, len(self.table)):
 	    dump_file.write("derivatives = []\n")
 	    for i in range(0, len(self.table[0])):
-	        dump_file.write("derivatives.append(" + self.table[l][i].__str__() + ")\n")
+	        poly_string = self.table[l][i].__str__()
+		poly_string = re.sub("([0-9]+\.[0-9]+e?-?[0-9]+)", r"eval_mpfr(\1, prec)", poly_string)
+	        dump_file.write("derivatives.append(" + poly_string + ")\n")
 	    dump_file.write("self.table.append(derivatives)\n")
 	
 	dump_file.close()
