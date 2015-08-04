@@ -295,11 +295,6 @@ class ConformalBlockTable:
 	conformal_blocks = []
 	
 	if name != None:
-	    num_derivs = ((derivative_order + 3) / 2) * (derivative_order + ((3 - ((derivative_order + 3) / 2)) / 2))
-	    
-	    for l in range(0, l_max + 1, step):
-	        self.table.append([0.0] * num_derivs)
-	    
 	    dump_file = open(name, 'r')
 	    command = dump_file.read()
 	    exec command
@@ -407,8 +402,10 @@ class ConformalBlockTable:
 	dump_file.write("self.n_order = " + self.n_order.__str__() + "\n")
 	
         for l in range(0, len(self.table)):
+	    dump_file.write("derivatives = []\n")
 	    for i in range(0, len(self.table[0])):
-	        dump_file.write("self.table[" + l.__str__() + "][" + i.__str__() + "] = " + self.table[l][i].__str__() + "\n")
+	        dump_file.write("derivatives.append(" + self.table[l][i].__str__() + ")\n")
+	    dump_file.write("self.table.append(derivatives)\n")
 	
 	dump_file.close()
     
