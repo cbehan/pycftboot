@@ -768,7 +768,7 @@ class SDP:
     def bisect(self, lower, upper, threshold, spin):
         test = (lower + upper) / 2.0
         if abs(upper - lower) < threshold:
-	    return upper
+	    return lower
 	else:
 	    print "Trying " + str(test)
 	    obj = [0.0] * len(self.table[0].vector)
