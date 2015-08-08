@@ -698,11 +698,13 @@ class SDP:
 		    polynomial_node.appendChild(coeff_node)
 		vector_node.appendChild(polynomial_node)
 	    elements_node.appendChild(vector_node)
-	    	       
+	    
 	    print "Getting points"
 	    poles = get_poles(self.dim, spin, self.kept_pole_order)
 	    index = self.get_index(laguerre_degrees, degree)
-	    if index == -1:
+	    if j >= len(self.bounds):
+	        points = [self.points[j - len(self.bounds)][1]]
+	    elif index == -1:
 	        points = self.make_laguerre_points(degree)
 		laguerre_points.append(points)
 		laguerre_degrees.append(degree)
