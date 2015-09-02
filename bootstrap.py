@@ -438,41 +438,44 @@ class ConvolvedBlockTable:
 	
 	z_norm = symbols('z_norm')
         z_conj = symbols('z_conj')
-	g = function_symbol('g', z_norm, z_conj)
-	f = (((1 - z_norm) * (1 - z_conj)) ** delta_ext) * g
+	
+	symbol_array = []
+	for m in range(0, block_table.derivative_order + 1):
+	    symbol_list = []
+	    for n in range(0, min(((block_table.derivative_order + 1) / 2), block_table.derivative_order - m) + 1):
+	        symbol_list.append(symbols('g_' + m.__str__() + '_' + n.__str__()))
+	    symbol_array.append(symbol_list)
 	
 	derivatives = []
-	old_expression = f
-	
 	for m in range(0, block_table.derivative_order + 1):
 	    for n in range(0, min(m, block_table.derivative_order - m) + 1):
-	        if n == 0 and m == 0:
-	            expression = old_expression
-	        elif n == 0:
-	            old_expression = old_expression.diff(z_norm).expand()
-	    	    expression = old_expression
-		else:
-		    expression = expression.diff(z_conj).expand()
-		    
-		# Skip even derivatives
+	        # Skip even derivatives
 		if (m + n) % 2 == 0:
 		    continue
 		
+		expression = 0
+		old_coeff = (z_cross * z_cross) ** delta_ext
+		for i in range(0, m + 1):
+		    coeff = old_coeff
+		    for j in range(0, n + 1):
+		        expression += coeff * symbol_array[max(m - i, n - j)][min(m - i, n - j)]
+		        coeff *= (j - delta_ext) * (n - j) / ((j + 1) * z_cross)
+		    old_coeff *= (i - delta_ext) * (m - i) / ((i + 1) * z_cross)
+	        
 		deriv = expression / (factorial(m) * factorial(n))
 		derivatives.append(deriv)
 		
 		for i in range(len(block_table.table[0]) - 1, 0, -1):
-		    deriv = deriv.subs(Derivative(g, [z_norm] * block_table.m_order[i] + [z_conj] * block_table.n_order[i]), 0)
-		deriv = deriv.subs(g, 1)
-		self.unit.append(2 * deriv.subs({z_norm : z_cross, z_conj : z_cross}))
+		    deriv = deriv.subs(symbol_array[block_table.m_order[i]][block_table.n_order[i]], 0)
+		self.unit.append(2 * deriv.subs(symbol_array[0][0], 1))
 	
 	for l in range(0, len(block_table.table), step):
 	    new_derivs = []
 	    for i in range(0, len(derivatives)):
 	        deriv = derivatives[i]
 	        for j in range(len(block_table.table[0]) - 1, 0, -1):
-		    deriv = deriv.subs(Derivative(g, [z_norm] * block_table.m_order[j] + [z_conj] * block_table.n_order[j]), block_table.table[l][j])
-		deriv = deriv.subs(g, block_table.table[l][0])
+		    deriv = deriv.subs(symbol_array[block_table.m_order[j]][block_table.n_order[j]], block_table.table[l][j])
+		deriv = deriv.subs(symbol_array[0][0], block_table.table[l][0])
 		new_derivs.append(2 * deriv.subs({z_norm : z_cross, z_conj : z_cross}))
 	    self.table.append(new_derivs)
 
