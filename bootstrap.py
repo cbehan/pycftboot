@@ -436,9 +436,6 @@ class ConvolvedBlockTable:
 	    self.odd_spins = block_table.odd_spins
 	    step = 1
 	
-	z_norm = symbols('z_norm')
-        z_conj = symbols('z_conj')
-	
 	symbol_array = []
 	for m in range(0, block_table.derivative_order + 1):
 	    symbol_list = []
@@ -475,8 +472,7 @@ class ConvolvedBlockTable:
 	        deriv = derivatives[i]
 	        for j in range(len(block_table.table[0]) - 1, 0, -1):
 		    deriv = deriv.subs(symbol_array[block_table.m_order[j]][block_table.n_order[j]], block_table.table[l][j])
-		deriv = deriv.subs(symbol_array[0][0], block_table.table[l][0])
-		new_derivs.append(2 * deriv.subs({z_norm : z_cross, z_conj : z_cross}))
+		new_derivs.append(2 * deriv.subs(symbol_array[0][0], block_table.table[l][0]))
 	    self.table.append(new_derivs)
 
 class SDP:
