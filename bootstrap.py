@@ -419,7 +419,7 @@ class ConformalBlockTable:
 	return ret
 
 class ConvolvedBlockTable:
-    def __init__(self, block_table, odd_spins = True):
+    def __init__(self, block_table, odd_spins = True, symmetric = False):
         # Copying everything but the unconvolved table is fine from a memory standpoint
         self.dim = block_table.dim
 	self.derivative_order = block_table.derivative_order
@@ -446,8 +446,8 @@ class ConvolvedBlockTable:
 	derivatives = []
 	for m in range(0, block_table.derivative_order + 1):
 	    for n in range(0, min(m, block_table.derivative_order - m) + 1):
-	        # Skip even derivatives
-		if (m + n) % 2 == 0:
+	        # Skip the ones that will vanish
+		if (symmetric == False and (m + n) % 2 == 0) or (symmetric = True and (m + n) % 2 == 1):
 		    continue
 		
 		expression = 0
