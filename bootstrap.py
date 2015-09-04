@@ -447,7 +447,7 @@ class ConvolvedBlockTable:
 	for m in range(0, block_table.derivative_order + 1):
 	    for n in range(0, min(m, block_table.derivative_order - m) + 1):
 	        # Skip the ones that will vanish
-		if (symmetric == False and (m + n) % 2 == 0) or (symmetric = True and (m + n) % 2 == 1):
+		if (symmetric == False and (m + n) % 2 == 0) or (symmetric == True and (m + n) % 2 == 1):
 		    continue
 		
 		expression = 0
