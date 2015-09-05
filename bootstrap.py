@@ -20,7 +20,7 @@ leading_blocks = []
 
 rho_cross = 3 - 2 * mpmath.sqrt(2)
 r_cross = eval_mpfr(3 - 2 * sqrt(2), prec)
-z_cross = eval_mpfr(sympy.Rational(1, 2), prec)
+two = eval_mpfr(2, prec)
 
 delta  = symbols('delta')
 delta_ext = symbols('delta_ext')
@@ -279,11 +279,12 @@ class SDPVector:
 	self.spin = l
 
 class ConformalBlockTable:
-    def __init__(self, dim, derivative_order, kept_pole_order, l_max, odd_spins = False, name = None):
+    def __init__(self, dim, l_max, m_max, n_max, kept_pole_order, odd_spins = False, name = None):
 	self.dim = dim
-	self.derivative_order = derivative_order
-	self.kept_pole_order = kept_pole_order
 	self.l_max = l_max
+	self.m_max = m_max
+	self.n_max = n_max
+	self.kept_pole_order = kept_pole_order
 	self.odd_spins = odd_spins
 	self.m_order = []
 	self.n_order = []
@@ -303,40 +304,40 @@ class ConformalBlockTable:
 	
 	print "Preparing blocks"
 	for l in range(0, l_max + 1, step):
-	    conformal_blocks.append(ConformalBlockVector(dim, l, derivative_order, kept_pole_order))
+	    conformal_blocks.append(ConformalBlockVector(dim, l, m_max + 2 * n_max, kept_pole_order))
 	    self.table.append([])
 	
-	z_norm = symbols('z_norm')
-	z_conj = symbols('z_conj')
-	r = function_symbol('r', z_norm, z_conj)
-	eta = function_symbol('eta', z_norm, z_conj)
+	a = symbols('a')
+	b = symbols('b')
+	r = function_symbol('r', a, b)
+	eta = function_symbol('eta', a, b)
 	old_coeff_grid = []
 	
 	rules1 = []
 	rules2 = []
-	old_expression1 = sqrt(z_norm * z_conj) / ((1 + sqrt(1 - z_norm)) * (1 + sqrt(1 - z_conj)))
-	old_expression2 = (sqrt(z_norm / z_conj) * ((1 + sqrt(1 - z_conj)) / (1 + sqrt(1 - z_norm))) + sqrt(z_conj / z_norm) * ((1 + sqrt(1 - z_norm)) / (1 + sqrt(1 - z_conj)))) / 2
+	old_expression1 = sqrt(a ** 2 - b) / (two + sqrt((two - a) ** 2 - b) + two * sqrt(two - a + sqrt((two - a) ** 2 - b)))
+	old_expression2 = (two - sqrt((two - a) ** 2 - b)) / sqrt(a ** 2 - b)
 	
 	print "Differentiating radial co-ordinates"
-	for m in range(0, derivative_order + 1):
-	    old_coeff_grid.append([0] * (derivative_order - m + 1))
+	for n in range(0, m_max + 2 * n_max + 1):
+	    old_coeff_grid.append([0] * (m_max + 2 * n_max + 1))
 	
-	for m in range(0, derivative_order + 1):
-	    for n in range(0, min(((derivative_order + 1) / 2), derivative_order - m) + 1):
+	for n in range(0, n_max + 1):
+	    for m in range(0, 2 * (n_max - n) + m_max + 1):
 		if n == 0 and m == 0:
 		    expression1 = old_expression1
 		    expression2 = old_expression2
-		elif n == 0:
-		    old_expression1 = old_expression1.diff(z_norm)
-		    old_expression2 = old_expression2.diff(z_norm)
+		elif m == 0:
+		    old_expression1 = old_expression1.diff(b)
+		    old_expression2 = old_expression2.diff(b)
 		    expression1 = old_expression1
 		    expression2 = old_expression2
 		else:
-		    expression1 = expression1.diff(z_conj)
-		    expression2 = expression2.diff(z_conj)
+		    expression1 = expression1.diff(a)
+		    expression2 = expression2.diff(a)
 		
-		rules1.append(expression1.subs({z_norm : z_cross, z_conj : z_cross}))
-		rules2.append(expression2.subs({z_norm : z_cross, z_conj : z_cross}))
+		rules1.append(expression1.subs({a : 1, b : 0}))
+		rules2.append(expression2.subs({a : 1, b : 0}))
 		self.m_order.append(m)
 		self.n_order.append(n)
 	
@@ -344,21 +345,21 @@ class ConformalBlockTable:
 	old_coeff_grid[0][0] = 1
 	order = 0
 	
-	for m in range(0, derivative_order + 1):
-	    for n in range(0, min(((derivative_order + 1) / 2), derivative_order - m) + 1):
-	        # Hack implementation of the g(r(z_norm, z_conj), eta(z_norm, z_conj)) chain rule
+	for n in range(0, n_max + 1):
+	    for m in range(0, 2 * (n_max - n) + m_max + 1):
+	        # Hack implementation of the g(r(a, b), eta(a, b)) chain rule
 	        if n == 0 and m == 0:
 		    coeff_grid = self.deepcopy(old_coeff_grid)
-		elif n == 0:
+		elif m == 0:
 		    for i in range(m + n - 1, -1, -1):
 		        for j in range(m + n - i - 1, -1, -1):
 			    coeff = old_coeff_grid[i][j]
 			    if type(coeff) == type(1):
 			        coeff_deriv = 0
 			    else:
-			        coeff_deriv = coeff.diff(z_norm)
-			    old_coeff_grid[i + 1][j] += coeff * r.diff(z_norm)
-			    old_coeff_grid[i][j + 1] += coeff * eta.diff(z_norm)
+			        coeff_deriv = coeff.diff(b)
+			    old_coeff_grid[i + 1][j] += coeff * r.diff(b)
+			    old_coeff_grid[i][j + 1] += coeff * eta.diff(b)
 			    old_coeff_grid[i][j] = coeff_deriv
 		    coeff_grid = self.deepcopy(old_coeff_grid)
 		else:
@@ -368,9 +369,9 @@ class ConformalBlockTable:
 			    if type(coeff) == type(1):
 			        coeff_deriv = 0
 			    else:
-			        coeff_deriv = coeff.diff(z_conj)
-			    coeff_grid[i + 1][j] += coeff * r.diff(z_conj)
-			    coeff_grid[i][j + 1] += coeff * eta.diff(z_conj)
+			        coeff_deriv = coeff.diff(a)
+			    coeff_grid[i + 1][j] += coeff * r.diff(a)
+			    coeff_grid[i][j + 1] += coeff * eta.diff(a)
 			    coeff_grid[i][j] = coeff_deriv
 		
 		# Replace r and eta derivatives with the rules found above
@@ -379,8 +380,8 @@ class ConformalBlockTable:
 		    for i in range(0, m + n + 1):
 		        for j in range(0, m + n - i + 1):
 			    if type(deriv[i][j]) != type(1):
-		                deriv[i][j] = deriv[i][j].subs(Derivative(r, [z_norm] * self.m_order[l] + [z_conj] * self.n_order[l]), rules1[l])
-		                deriv[i][j] = deriv[i][j].subs(Derivative(eta, [z_norm] * self.m_order[l] + [z_conj] * self.n_order[l]), rules2[l])
+		                deriv[i][j] = deriv[i][j].subs(Derivative(r, [a] * self.m_order[l] + [b] * self.n_order[l]), rules1[l])
+		                deriv[i][j] = deriv[i][j].subs(Derivative(eta, [a] * self.m_order[l] + [b] * self.n_order[l]), rules2[l])
 		
 		# Replace conformal block derivatives similarly for each spin
 		for l in range(0, len(conformal_blocks)):
@@ -395,9 +396,10 @@ class ConformalBlockTable:
         dump_file = open(name, 'w')
 	
 	dump_file.write("self.dim = " + self.dim.__str__() + "\n")
-	dump_file.write("self.derivative_order = " + self.derivative_order.__str__() + "\n")
-	dump_file.write("self.kept_pole_order = " + self.kept_pole_order.__str__() + "\n")
 	dump_file.write("self.l_max = " + self.l_max.__str__() + "\n")
+	dump_file.write("self.m_max = " + self.m_max.__str__() + "\n")
+	dump_file.write("self.n_max = " + self.n_max.__str__() + "\n")
+	dump_file.write("self.kept_pole_order = " + self.kept_pole_order.__str__() + "\n")
 	dump_file.write("self.odd_spins = " + self.odd_spins.__str__() + "\n")
 	dump_file.write("self.m_order = " + self.m_order.__str__() + "\n")
 	dump_file.write("self.n_order = " + self.n_order.__str__() + "\n")
@@ -422,9 +424,10 @@ class ConvolvedBlockTable:
     def __init__(self, block_table, odd_spins = True, symmetric = False):
         # Copying everything but the unconvolved table is fine from a memory standpoint
         self.dim = block_table.dim
-	self.derivative_order = block_table.derivative_order
-	self.kept_pole_order = block_table.kept_pole_order
 	self.l_max = block_table.l_max
+	self.m_max = block_table.m_max
+	self.n_max = block_table.n_max
+	self.kept_pole_order = block_table.kept_pole_order
 	self.table = []
 	self.unit = []
 	
@@ -437,33 +440,33 @@ class ConvolvedBlockTable:
 	    step = 1
 	
 	symbol_array = []
-	for m in range(0, block_table.derivative_order + 1):
+	for n in range(0, block_table.n_max + 1):
 	    symbol_list = []
-	    for n in range(0, min(((block_table.derivative_order + 1) / 2), block_table.derivative_order - m) + 1):
-	        symbol_list.append(symbols('g_' + m.__str__() + '_' + n.__str__()))
+	    for m in range(0, 2 * (block_table.n_max - n) + block_table.m_max + 1):
+	        symbol_list.append(symbols('g_' + n.__str__() + '_' + m.__str__()))
 	    symbol_array.append(symbol_list)
 	
 	derivatives = []
-	for m in range(0, block_table.derivative_order + 1):
-	    for n in range(0, min(m, block_table.derivative_order - m) + 1):
+	for n in range(0, block_table.n_max + 1):
+	    for m in range(0, 2 * (block_table.n_max - n) + block_table.m_max + 1):
 	        # Skip the ones that will vanish
-		if (symmetric == False and (m + n) % 2 == 0) or (symmetric == True and (m + n) % 2 == 1):
+		if (symmetric == False and m % 2 == 0) or (symmetric == True and m % 2 == 1):
 		    continue
 		
 		expression = 0
-		old_coeff = (z_cross * z_cross) ** delta_ext
-		for i in range(0, m + 1):
+		old_coeff = eval_mpfr(sympy.Rational(1, 4), prec) ** delta_ext
+		for j in range(0, n + 1):
 		    coeff = old_coeff
-		    for j in range(0, n + 1):
-		        expression += coeff * symbol_array[max(m - i, n - j)][min(m - i, n - j)]
-		        coeff *= (j - delta_ext) * (n - j) / ((j + 1) * z_cross)
-		    old_coeff *= (i - delta_ext) * (m - i) / ((i + 1) * z_cross)
+		    for i in range(0, m + 1):
+		        expression += coeff * symbol_array[n - j][m - i]
+		        coeff *= (i + 2 * j - 2 * delta_ext) * (m - i) / (i + 1)
+		    old_coeff *= (j - delta_ext) * (n - j) / (j + 1)
 	        
 		deriv = expression / (factorial(m) * factorial(n))
 		derivatives.append(deriv)
 		
 		for i in range(len(block_table.table[0]) - 1, 0, -1):
-		    deriv = deriv.subs(symbol_array[block_table.m_order[i]][block_table.n_order[i]], 0)
+		    deriv = deriv.subs(symbol_array[block_table.n_order[i]][block_table.m_order[i]], 0)
 		self.unit.append(2 * deriv.subs(symbol_array[0][0], 1))
 	
 	for l in range(0, len(block_table.table), step):
@@ -471,7 +474,7 @@ class ConvolvedBlockTable:
 	    for i in range(0, len(derivatives)):
 	        deriv = derivatives[i]
 	        for j in range(len(block_table.table[0]) - 1, 0, -1):
-		    deriv = deriv.subs(symbol_array[block_table.m_order[j]][block_table.n_order[j]], block_table.table[l][j])
+		    deriv = deriv.subs(symbol_array[block_table.n_order[j]][block_table.m_order[j]], block_table.table[l][j])
 		new_derivs.append(2 * deriv.subs(symbol_array[0][0], block_table.table[l][0]))
 	    self.table.append(new_derivs)
 
@@ -479,9 +482,10 @@ class SDP:
     def __init__(self, conv_block_table, dim_ext):
         # Same story here
         self.dim = conv_block_table.dim
-	self.derivative_order = conv_block_table.derivative_order
-	self.kept_pole_order = conv_block_table.kept_pole_order
 	self.l_max = conv_block_table.l_max
+	self.m_max = conv_block_table.m_max
+	self.n_max = conv_block_table.n_max
+	self.kept_pole_order = conv_block_table.kept_pole_order
 	self.odd_spins = conv_block_table.odd_spins
 	
 	self.unit = []
