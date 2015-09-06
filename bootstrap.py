@@ -309,14 +309,15 @@ class ConformalBlockTable:
 	
 	a = symbols('a')
 	b = symbols('b')
+	hack = symbols('hack')
 	r = function_symbol('r', a, b)
 	eta = function_symbol('eta', a, b)
 	old_coeff_grid = []
 	
 	rules1 = []
 	rules2 = []
-	old_expression1 = sqrt(a ** 2 - b) / (two + sqrt((two - a) ** 2 - b) + two * sqrt(two - a + sqrt((two - a) ** 2 - b)))
-	old_expression2 = (two - sqrt((two - a) ** 2 - b)) / sqrt(a ** 2 - b)
+	old_expression1 = sqrt(a ** 2 - b) / (hack + sqrt((hack - a) ** 2 - b) + hack * sqrt(hack - a + sqrt((hack - a) ** 2 - b)))
+	old_expression2 = (hack - sqrt((hack - a) ** 2 - b)) / sqrt(a ** 2 - b)
 	
 	print "Differentiating radial co-ordinates"
 	for n in range(0, m_max + 2 * n_max + 1):
@@ -336,8 +337,8 @@ class ConformalBlockTable:
 		    expression1 = expression1.diff(a)
 		    expression2 = expression2.diff(a)
 		
-		rules1.append(expression1.subs({a : 1, b : 0}))
-		rules2.append(expression2.subs({a : 1, b : 0}))
+		rules1.append(expression1.subs({hack : two, a : 1, b : 0}))
+		rules2.append(expression2.subs({hack : two, a : 1, b : 0}))
 		self.m_order.append(m)
 		self.n_order.append(n)
 	
