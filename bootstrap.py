@@ -20,7 +20,6 @@ leading_blocks = []
 
 rho_cross = 3 - 2 * mpmath.sqrt(2)
 r_cross = eval_mpfr(3 - 2 * sqrt(2), prec)
-two = eval_mpfr(2, prec)
 
 delta  = symbols('delta')
 delta_ext = symbols('delta_ext')
@@ -337,8 +336,8 @@ class ConformalBlockTable:
 		    expression1 = expression1.diff(a)
 		    expression2 = expression2.diff(a)
 		
-		rules1.append(expression1.subs({hack : two, a : 1, b : 0}))
-		rules2.append(expression2.subs({hack : two, a : 1, b : 0}))
+		rules1.append(expression1.subs({hack : eval_mpfr(2, prec), a : 1, b : 0}))
+		rules2.append(expression2.subs({hack : eval_mpfr(2, prec), a : 1, b : 0}))
 		self.m_order.append(m)
 		self.n_order.append(n)
 	
@@ -419,6 +418,86 @@ class ConformalBlockTable:
         ret = []
 	for el in array:
 	    ret.append(list(el))
+	return ret
+
+class ConformalBlockTableFast:
+    def __init__(self, dim, l_max, m_max, n_max, kept_pole_order, odd_spins = False, name = None):
+	self.dim = dim
+	self.l_max = l_max
+	self.m_max = m_max
+	self.n_max = n_max
+	self.kept_pole_order = kept_pole_order
+	self.odd_spins = odd_spins
+	
+	small_table = ConformalBlockTable(dim, l_max, min(m_max + 2 * n_max, 3), 0, kept_pole_order, odd_spins)
+	self.m_order = small_table.m_order
+	self.n_order = small_table.n_order
+	self.table = small_table.table
+	
+	l = symbols('l')
+	nu = eval_mpfr(sympy.Rational(dim, 2) - 1, prec)
+	c_2 = (l * (l + self.dim - 2) + delta * (delta - self.dim)) / 2
+	c_4 = l * (l + self.dim - 2) * (delta - 1) * (delta + 1 - self.dim)
+	polys = [[], [], [], [], [], []]
+	delta_prod = 0
+	delta_sum = 0
+	
+	# Polynomial 0 goes with the lowest order derivative on the right hand side
+	# Polynomial 4 goes with the highest order derivative on the right hand side
+	# Polynomial 5 goes with the derivative for which we are solving
+	polys[0] = [0, 0, 0]
+	polys[1].append(16 * c_2 * (2 * nu + 1) - 8 * c_4)
+	polys[1].append(4 * (c_4 + 2 * (2 * nu + 1) * (c_2 * delta_sum - c_2 + nu * delta_prod)))
+	polys[1].append(2 * (delta_sum - nu) * (c_2 * (2 * delta_sum - 1) + delta_prod * (6 * nu - 1)))
+	polys[1].append(2 * delta_prod * (delta_sum - nu) * (delta_sum - nu + 1))
+	polys[2].append(0)
+	polys[2].append(-16 * c_2 * (2 * nu + 1))
+	polys[2].append(4 * delta_prod - 24 * nu * delta_prod + 8 * nu * (2 * nu - 1) * (2 * delta_sum + 1) + 4 * c_2 * (1 - 4 * delta_sum + 6 * nu))
+	polys[2].append(2 * c_2 * (4 * delta_sum - 2 * nu + 1) + 4 * (2 * nu - 1) * (2 * delta_sum + 1) * (delta_sum - nu + 1) + 2 * delta_prod * (10 * nu - 5 - 4 * delta_sum))
+	polys[2].append((delta_sum - nu + 1) * (4 * delta_prod + (2 * delta_sum + 1) * (delta_sum - nu + 2)))
+	polys[3].append(0)
+	polys[3].append(0)
+	polys[3].append(16 * c_2 + 16 * nu - 32 * nu * nu)
+	polys[3].append(8 * delta_prod - 8 * (3 * delta_sum - nu + 3) * (2 * nu - 1) - 16 * c_2 - 8 * nu + 16 * nu * nu) # last + not -
+	polys[3].append(4 * (c_2 - delta_prod + (3 * delta_sum - nu + 3) * (2 * nu - 1)) - 4 * delta_prod - 2 * (delta_sum - nu + 2) * (5 * delta_sum - nu + 5))
+	polys[3].append(2 * delta_prod + (delta_sum - nu + 2) * (5 * delta_sum - nu + 5))
+	polys[4].append(0)
+	polys[4].append(0)
+	polys[4].append(0)
+	polys[4].append(32 * nu - 16)
+	polys[4].append(16 - 32 * nu + 4 * (4 * delta_sum - 2 * nu + 7))
+	polys[4].append(4 * (2 * nu - 1) - 4 * (4 * delta_sum - 2 * nu + 7))
+	polys[4].append(4 * delta_sum - 2 * nu + 7)
+	polys[5] = [0, 0, 0, 0, -8, 12, -6, 1]
+	
+	for m in range(4, m_max + 2 * n_max + 1):
+	    for j in range(0, len(small_table.table)):
+	        if self.odd_spins:
+	            spin = j
+	        else:
+	            spin = 2 * j
+		
+		new_deriv = 0
+		for i in range(max(m - 5, 0), m):
+		    new_deriv -= self.coeff_sum(polys[i + 5 - m]).subs(l, spin) * self.table[j][i]
+		
+		new_deriv = new_deriv / self.coeff_sum(polys[5])
+		self.table[j].append(new_deriv.expand())
+	    
+	    # We store individual coefficients instead of just their sums
+	    # This is to keep track of how a derivative of the whole equation rearranges them
+	    for j in range(0, 5):
+		for i in range(0, len(polys[j])):
+		    polys[j][i] += (i + 1) * polys[j + 1][i + 1]
+	    
+	    self.m_order.append(m)
+	    self.n_order.append(0)
+    
+    # Since a = 1 at the crossing point, substituting this is the same as adding the coefficients
+    def coeff_sum(self, poly):
+        ret = 0
+	for p in poly:
+	    ret += p
 	return ret
 
 class ConvolvedBlockTable:
