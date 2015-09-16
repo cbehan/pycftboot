@@ -73,12 +73,12 @@ def omit_all(poles, special_pole):
 	    expression *= (delta - p)
     return expression
 
-def leading_block(nu, R, Eta, l):
+def leading_block(nu, r, eta, l):
     if nu == 0:
-        ret = sympy.chebyshevt(l, Eta)
+        ret = sympy.chebyshevt(l, eta)
     else:
-        ret = factorial(l) * sympy.gegenbauer(l, nu, Eta) / sympy.rf(2 * nu, l)
-    return ret / (((1 - R ** 2) ** nu) * sqrt((1 + R ** 2) ** 2 - 4 * (R * Eta) ** 2))
+        ret = factorial(l) * sympy.gegenbauer(l, nu, eta) / sympy.rf(2 * nu, l)
+    return ret / (((1 - r ** 2) ** nu) * sqrt((1 + r ** 2) ** 2 - 4 * (r * eta) ** 2))
 
 class LeadingBlockVector:
     def __init__(self, dim, derivative_order, l):
@@ -429,7 +429,8 @@ class ConformalBlockTableFast:
 	self.kept_pole_order = kept_pole_order
 	self.odd_spins = odd_spins
 	
-	small_table = ConformalBlockTable(dim, l_max, min(m_max + 2 * n_max, 3), 0, kept_pole_order, odd_spins)
+	#small_table = ConformalBlockTable(dim, l_max, min(m_max + 2 * n_max, 3), 0, kept_pole_order, odd_spins)
+	small_table = ConformalBlockTable(dim, l_max, m_max + 2 * n_max, 0, kept_pole_order, odd_spins)
 	self.m_order = small_table.m_order
 	self.n_order = small_table.n_order
 	self.table = small_table.table
@@ -458,7 +459,7 @@ class ConformalBlockTableFast:
 	polys[3].append(0)
 	polys[3].append(0)
 	polys[3].append(16 * c_2 + 16 * nu - 32 * nu * nu)
-	polys[3].append(8 * delta_prod - 8 * (3 * delta_sum - nu + 3) * (2 * nu - 1) - 16 * c_2 - 8 * nu + 16 * nu * nu) # last + not -
+	polys[3].append(8 * delta_prod - 8 * (3 * delta_sum - nu + 3) * (2 * nu - 1) - 16 * c_2 - 8 * nu + 16 * nu * nu)
 	polys[3].append(4 * (c_2 - delta_prod + (3 * delta_sum - nu + 3) * (2 * nu - 1)) - 4 * delta_prod - 2 * (delta_sum - nu + 2) * (5 * delta_sum - nu + 5))
 	polys[3].append(2 * delta_prod + (delta_sum - nu + 2) * (5 * delta_sum - nu + 5))
 	polys[4].append(0)
@@ -469,8 +470,8 @@ class ConformalBlockTableFast:
 	polys[4].append(4 * (2 * nu - 1) - 4 * (4 * delta_sum - 2 * nu + 7))
 	polys[4].append(4 * delta_sum - 2 * nu + 7)
 	polys[5] = [0, 0, 0, 0, -8, 12, -6, 1]
-	
-	for m in range(4, m_max + 2 * n_max + 1):
+
+	for m in range(self.m_order[-1] + 1, m_max + 2 * n_max + 1):
 	    for j in range(0, len(small_table.table)):
 	        if self.odd_spins:
 	            spin = j
@@ -492,6 +493,55 @@ class ConformalBlockTableFast:
 	    
 	    self.m_order.append(m)
 	    self.n_order.append(0)
+
+	# This is just an alternative to storing derivatives as a doubly-indexed list
+	index = m_max + 2 * n_max + 1
+	index_map = [range(0, m_max + 2 * n_max + 1)]
+	
+	for n in range(1, n_max + 1):
+	    index_map.append([])
+	    for m in range(0, 2 * (n_max - n) + m_max + 1):
+	        index_map[n].append(index)
+		
+	        coeff1 = m * (-1) * (2 - 4 * n - 4 * nu)
+		coeff2 = m * (m - 1) * (2 - 4 * n - 4 * nu)
+		coeff3 = m * (m - 1) * (m - 2) * (2 - 4 * n - 4 * nu)
+		coeff4 = 1
+		coeff5 = (-6 + m + 4 * n - 2 * nu - 2 * delta_sum)
+		coeff6 = (-1) * (4 * c_2 + m * m + 8 * m * n - 5 * m + 4 * n * n - 2 * n - 2 - 4 * nu * (1 - m - n) + delta_sum * (m + 2 * n - 2) + 2 * delta_prod)
+		coeff7 = m * (-1) * (m * m + 12 * m * n - 13 * m + 12 * n * n - 34 * n + 22 - 2 * nu * (2 * n - m - 1) + 2 * delta_sum * (m + 4 * n - 5) + 4 * delta_prod)
+		coeff8 = (1 - n)
+		coeff9 = (1 - n) * (-6 + 3 * m + 4 * n - 2 * nu + 2 * delta_sum)
+		
+	        for j in range(0, len(small_table.table)):
+		    if self.odd_spins:
+	                spin = j
+	            else:
+	                spin = 2 * j
+		    new_deriv = 0
+		    
+		    if m > 0:
+		        new_deriv += coeff1 * self.table[j][index_map[n][m - 1]]
+		    if m > 1:
+		        new_deriv += coeff2 * self.table[j][index_map[n][m - 2]]
+		    if m > 2:
+		        new_deriv += coeff3 * self.table[j][index_map[n][m - 3]]
+		    
+		    new_deriv += coeff4 * self.table[j][index_map[n - 1][m + 2]]
+		    new_deriv += coeff5 * self.table[j][index_map[n - 1][m + 1]]
+		    new_deriv += coeff6.subs(l, spin) * self.table[j][index_map[n - 1][m]]
+		    new_deriv += coeff7 * self.table[j][index_map[n - 1][m - 1]]
+		    
+		    if n > 1:
+		        new_deriv += coeff8 * self.table[j][index_map[n - 2][m + 2]]
+			new_deriv += coeff9 * self.table[j][index_map[n - 2][m + 1]]
+		    
+		    new_deriv = new_deriv / (2 - 4 * n - 4 * nu)
+		    self.table[j].append(new_deriv.expand())
+		
+	        self.m_order.append(m)
+	        self.n_order.append(n)
+		index += 1
     
     # Since a = 1 at the crossing point, substituting this is the same as adding the coefficients
     def coeff_sum(self, poly):
