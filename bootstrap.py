@@ -235,7 +235,7 @@ class MeromorphicBlockVector:
 		        res /= Delta - pole
 		    else:
 		        current_series = 3
-			sign = sympy.Rational(2 - old_series, old_series - current_series)
+			sign = sympy.Rational(old_series - 2, old_series - current_series)
 			if old_pair[0] == delta:
 		            res *= sign
 		        else:
@@ -437,8 +437,8 @@ class ConformalBlockTableFast:
 	
 	l = symbols('l')
 	nu = eval_mpfr(sympy.Rational(dim, 2) - 1, prec)
-	c_2 = (l * (l + self.dim - 2) + delta * (delta - self.dim)) / 2
-	c_4 = l * (l + self.dim - 2) * (delta - 1) * (delta + 1 - self.dim)
+	c_2 = (l * (l + 2 * nu) + delta * (delta - 2 * nu - 2)) / 2
+	c_4 = l * (l + 2 * nu) * (delta - 1) * (delta - 2 * nu - 1)
 	polys = [[], [], [], [], [], []]
 	delta_prod = 0
 	delta_sum = 0
