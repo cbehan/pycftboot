@@ -80,6 +80,29 @@ def leading_block(nu, r, eta, l):
         ret = factorial(l) * sympy.gegenbauer(l, nu, eta) / sympy.rf(2 * nu, l)
     return ret / (((1 - r ** 2) ** nu) * sqrt((1 + r ** 2) ** 2 - 4 * (r * eta) ** 2))
 
+def dump_table_contents(block_table, name):
+    dump_file = open(name, 'w')
+
+    dump_file.write("self.dim = " + block_table.dim.__str__() + "\n")
+    dump_file.write("self.l_max = " + block_table.l_max.__str__() + "\n")
+    dump_file.write("self.m_max = " + block_table.m_max.__str__() + "\n")
+    dump_file.write("self.n_max = " + block_table.n_max.__str__() + "\n")
+    dump_file.write("self.kept_pole_order = " + block_table.kept_pole_order.__str__() + "\n")
+    dump_file.write("self.odd_spins = " + block_table.odd_spins.__str__() + "\n")
+    dump_file.write("self.m_order = " + block_table.m_order.__str__() + "\n")
+    dump_file.write("self.n_order = " + block_table.n_order.__str__() + "\n")
+    dump_file.write("self.table = []\n")
+    
+    for l in range(0, len(block_table.table)):
+        dump_file.write("derivatives = []\n")
+        for i in range(0, len(block_table.table[0])):
+            poly_string = block_table.table[l].vector[i].__str__()
+	    poly_string = re.sub("([0-9]+\.[0-9]+e?-?[0-9]+)", r"eval_mpfr(\1, prec)", poly_string)
+            dump_file.write("derivatives.append(" + poly_string + ")\n")
+	    dump_file.write("self.table.append(PolynomialVector(derivatives, " + block_table[l].spin.__str__() + "))\n")
+
+    dump_file.close()
+
 class LeadingBlockVector:
     def __init__(self, dim, derivative_order, l):
 	self.spin = l
@@ -277,7 +300,7 @@ class PolynomialVector:
         self.vector = derivatives
 	self.spin = l
 
-class ConformalBlockTable:
+class ConformalBlockTableSeed:
     def __init__(self, dim, l_max, m_max, n_max, kept_pole_order, odd_spins = False, name = None):
 	self.dim = dim
 	self.l_max = l_max
@@ -304,7 +327,7 @@ class ConformalBlockTable:
 	print "Preparing blocks"
 	for l in range(0, l_max + 1, step):
 	    conformal_blocks.append(ConformalBlockVector(dim, l, m_max + 2 * n_max, kept_pole_order))
-	    self.table.append([])
+	    self.table.append(PolynomialVector([], l))
 	
 	a = symbols('a')
 	b = symbols('b')
@@ -389,30 +412,11 @@ class ConformalBlockTable:
 		    for i in range(0, m + n + 1):
 		        for j in range(0, m + n - i + 1):
 			    new_deriv += deriv[i][j] * conformal_blocks[l].chunks[j].get(i, 0)
-		    self.table[l].append(new_deriv.expand())
+		    self.table[l].vector.append(new_deriv.expand())
 		order += 1
     
     def dump(self, name):
-        dump_file = open(name, 'w')
-	
-	dump_file.write("self.dim = " + self.dim.__str__() + "\n")
-	dump_file.write("self.l_max = " + self.l_max.__str__() + "\n")
-	dump_file.write("self.m_max = " + self.m_max.__str__() + "\n")
-	dump_file.write("self.n_max = " + self.n_max.__str__() + "\n")
-	dump_file.write("self.kept_pole_order = " + self.kept_pole_order.__str__() + "\n")
-	dump_file.write("self.odd_spins = " + self.odd_spins.__str__() + "\n")
-	dump_file.write("self.m_order = " + self.m_order.__str__() + "\n")
-	dump_file.write("self.n_order = " + self.n_order.__str__() + "\n")
-	
-        for l in range(0, len(self.table)):
-	    dump_file.write("derivatives = []\n")
-	    for i in range(0, len(self.table[0])):
-	        poly_string = self.table[l][i].__str__()
-		poly_string = re.sub("([0-9]+\.[0-9]+e?-?[0-9]+)", r"eval_mpfr(\1, prec)", poly_string)
-	        dump_file.write("derivatives.append(" + poly_string + ")\n")
-	    dump_file.write("self.table.append(derivatives)\n")
-	
-	dump_file.close()
+        dump_table_conents(self, name)
     
     def deepcopy(self, array):
         ret = []
@@ -420,7 +424,7 @@ class ConformalBlockTable:
 	    ret.append(list(el))
 	return ret
 
-class ConformalBlockTableFast:
+class ConformalBlockTable:
     def __init__(self, dim, l_max, m_max, n_max, kept_pole_order, odd_spins = False, name = None):
 	self.dim = dim
 	self.l_max = l_max
@@ -429,8 +433,14 @@ class ConformalBlockTableFast:
 	self.kept_pole_order = kept_pole_order
 	self.odd_spins = odd_spins
 	
-	#small_table = ConformalBlockTable(dim, l_max, min(m_max + 2 * n_max, 3), 0, kept_pole_order, odd_spins)
-	small_table = ConformalBlockTable(dim, l_max, m_max + 2 * n_max, 0, kept_pole_order, odd_spins)
+	if name != None:
+	    dump_file = open(name, 'r')
+	    command = dump_file.read()
+	    exec command
+	    return
+	
+	#small_table = ConformalBlockTableSeed(dim, l_max, min(m_max + 2 * n_max, 3), 0, kept_pole_order, odd_spins)
+	small_table = ConformalBlockTableSeed(dim, l_max, m_max + 2 * n_max, 0, kept_pole_order, odd_spins)
 	self.m_order = small_table.m_order
 	self.n_order = small_table.n_order
 	self.table = small_table.table
@@ -473,17 +483,12 @@ class ConformalBlockTableFast:
 
 	for m in range(self.m_order[-1] + 1, m_max + 2 * n_max + 1):
 	    for j in range(0, len(small_table.table)):
-	        if self.odd_spins:
-	            spin = j
-	        else:
-	            spin = 2 * j
-		
 		new_deriv = 0
 		for i in range(max(m - 5, 0), m):
-		    new_deriv -= self.coeff_sum(polys[i + 5 - m]).subs(l, spin) * self.table[j][i]
+		    new_deriv -= self.coeff_sum(polys[i + 5 - m]).subs(l, small_table.table[j].spin) * self.table[j].vector[i]
 		
 		new_deriv = new_deriv / self.coeff_sum(polys[5])
-		self.table[j].append(new_deriv.expand())
+		self.table[j].vector.append(new_deriv.expand())
 	    
 	    # We store individual coefficients instead of just their sums
 	    # This is to keep track of how a derivative of the whole equation rearranges them
@@ -514,10 +519,6 @@ class ConformalBlockTableFast:
 		coeff9 = (1 - n) * (-6 + 3 * m + 4 * n - 2 * nu + 2 * delta_sum)
 		
 	        for j in range(0, len(small_table.table)):
-		    if self.odd_spins:
-	                spin = j
-	            else:
-	                spin = 2 * j
 		    new_deriv = 0
 		    
 		    if m > 0:
@@ -529,7 +530,7 @@ class ConformalBlockTableFast:
 		    
 		    new_deriv += coeff4 * self.table[j][index_map[n - 1][m + 2]]
 		    new_deriv += coeff5 * self.table[j][index_map[n - 1][m + 1]]
-		    new_deriv += coeff6.subs(l, spin) * self.table[j][index_map[n - 1][m]]
+		    new_deriv += coeff6.subs(l, small_table.table[j].spin) * self.table[j][index_map[n - 1][m]]
 		    new_deriv += coeff7 * self.table[j][index_map[n - 1][m - 1]]
 		    
 		    if n > 1:
@@ -537,11 +538,14 @@ class ConformalBlockTableFast:
 			new_deriv += coeff9 * self.table[j][index_map[n - 2][m + 1]]
 		    
 		    new_deriv = new_deriv / (2 - 4 * n - 4 * nu)
-		    self.table[j].append(new_deriv.expand())
+		    self.table[j].vector.append(new_deriv.expand())
 		
 	        self.m_order.append(m)
 	        self.n_order.append(n)
 		index += 1
+    
+    def dump(self, name):
+        dump_table_conents(self, name)
     
     # Since a = 1 at the crossing point, substituting this is the same as adding the coefficients
     def coeff_sum(self, poly):
@@ -558,6 +562,9 @@ class ConvolvedBlockTable:
 	self.m_max = block_table.m_max
 	self.n_max = block_table.n_max
 	self.kept_pole_order = block_table.kept_pole_order
+	
+	self.m_order = []
+	self.n_order = []
 	self.table = []
 	self.unit = []
 	
@@ -583,6 +590,9 @@ class ConvolvedBlockTable:
 		if (symmetric == False and m % 2 == 0) or (symmetric == True and m % 2 == 1):
 		    continue
 		
+		self.m_order.append(m)
+		self.n_order.append(n)
+		
 		expression = 0
 		old_coeff = eval_mpfr(sympy.Rational(1, 4), prec) ** delta_ext
 		for j in range(0, n + 1):
@@ -595,25 +605,18 @@ class ConvolvedBlockTable:
 		deriv = expression / (factorial(m) * factorial(n))
 		derivatives.append(deriv)
 		
-		for i in range(len(block_table.table[0]) - 1, 0, -1):
+		for i in range(len(block_table.table[0].vector) - 1, 0, -1):
 		    deriv = deriv.subs(symbol_array[block_table.n_order[i]][block_table.m_order[i]], 0)
 		self.unit.append(2 * deriv.subs(symbol_array[0][0], 1))
 	
 	for l in range(0, len(block_table.table), step):
-	    if self.odd_spins:
-	        spin = l
-	    elif step == 1:
-	        spin = 2 * l
-	    else:
-	        spin = l
-	    
 	    new_derivs = []
 	    for i in range(0, len(derivatives)):
 	        deriv = derivatives[i]
-	        for j in range(len(block_table.table[0]) - 1, 0, -1):
-		    deriv = deriv.subs(symbol_array[block_table.n_order[j]][block_table.m_order[j]], block_table.table[l][j])
-		new_derivs.append(2 * deriv.subs(symbol_array[0][0], block_table.table[l][0]))
-	    self.table.append(PolynomialVector(new_derivs, spin))
+	        for j in range(len(block_table.table[0].vector) - 1, 0, -1):
+		    deriv = deriv.subs(symbol_array[block_table.n_order[j]][block_table.m_order[j]], block_table.table[l].vector[j])
+		new_derivs.append(2 * deriv.subs(symbol_array[0][0], block_table.table[l].vector[0]))
+	    self.table.append(PolynomialVector(new_derivs, block_table.table[l].spin))
 
 class SDP:
     def __init__(self, conv_block_table, dim_ext):
@@ -625,8 +628,10 @@ class SDP:
 	self.kept_pole_order = conv_block_table.kept_pole_order
 	self.odd_spins = conv_block_table.odd_spins
 	
-	self.unit = []
+	self.m_order = conv_block_table.m_order
+	self.n_order = conv_block_table.n_order
 	self.table = []
+	self.unit = []
 	self.points = []
 	
 	for i in range(0, len(conv_block_table.table[0].vector)):
@@ -634,15 +639,10 @@ class SDP:
 	    self.unit.append(unit)
 
 	for l in range(0, len(conv_block_table.table)):
-	    if self.odd_spins:
-	        spin = l
-	    else:
-	        spin = 2 * l
-	    
 	    derivatives = []
 	    for i in range(0, len(conv_block_table.table[l].vector)):
 	        derivatives.append(conv_block_table.table[l].vector[i].subs(delta_ext, dim_ext))
-	    self.table.append(PolynomialVector(derivatives, spin))
+	    self.table.append(PolynomialVector(derivatives, conv_block_table.table[l].spin))
 	
 	self.bounds = [0.0] * len(self.table)
 	self.set_bound()
@@ -795,8 +795,6 @@ class SDP:
 	    objective_node.appendChild(elt_node)
 	
 	for j in range(0, len(self.table)):
-	    spin = self.table[j].spin
-	    
 	    matrix_node = doc.createElement("polynomialVectorMatrix")
 	    rows_node = doc.createElement("rows")
 	    cols_node = doc.createElement("cols")
@@ -840,7 +838,7 @@ class SDP:
 	    elements_node.appendChild(vector_node)
 	    
 	    print "Getting points"
-	    poles = get_poles(self.dim, spin, self.kept_pole_order)
+	    poles = get_poles(self.dim, self.table[j].spin, self.kept_pole_order)
 	    index = self.get_index(laguerre_degrees, degree)
 	    if j >= len(self.bounds):
 	        points = [self.points[j - len(self.bounds)][1]]
