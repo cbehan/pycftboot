@@ -272,7 +272,7 @@ class ConformalBlockVector:
 	    s_sub = s_matrix.submatrix(0, derivative_order - i, 0, derivative_order - i)
 	    self.chunks.append(s_sub.mul_matrix(meromorphic_block.chunks[i]))
 
-class SDPVector:
+class PolynomialVector:
     def __init__(self, derivatives, l):
         self.vector = derivatives
 	self.spin = l
@@ -600,13 +600,20 @@ class ConvolvedBlockTable:
 		self.unit.append(2 * deriv.subs(symbol_array[0][0], 1))
 	
 	for l in range(0, len(block_table.table), step):
+	    if self.odd_spins:
+	        spin = l
+	    elif step == 1:
+	        spin = 2 * l
+	    else:
+	        spin = l
+	    
 	    new_derivs = []
 	    for i in range(0, len(derivatives)):
 	        deriv = derivatives[i]
 	        for j in range(len(block_table.table[0]) - 1, 0, -1):
 		    deriv = deriv.subs(symbol_array[block_table.n_order[j]][block_table.m_order[j]], block_table.table[l][j])
 		new_derivs.append(2 * deriv.subs(symbol_array[0][0], block_table.table[l][0]))
-	    self.table.append(new_derivs)
+	    self.table.append(PolynomialVector(new_derivs, spin))
 
 class SDP:
     def __init__(self, conv_block_table, dim_ext):
@@ -622,7 +629,7 @@ class SDP:
 	self.table = []
 	self.points = []
 	
-	for i in range(0, len(conv_block_table.table[0])):
+	for i in range(0, len(conv_block_table.table[0].vector)):
 	    unit = conv_block_table.unit[i].subs(delta_ext, dim_ext)
 	    self.unit.append(unit)
 
@@ -633,9 +640,9 @@ class SDP:
 	        spin = 2 * l
 	    
 	    derivatives = []
-	    for i in range(0, len(conv_block_table.table[l])):
-	        derivatives.append(conv_block_table.table[l][i].subs(delta_ext, dim_ext))
-	    self.table.append(SDPVector(derivatives, spin))
+	    for i in range(0, len(conv_block_table.table[l].vector)):
+	        derivatives.append(conv_block_table.table[l].vector[i].subs(delta_ext, dim_ext))
+	    self.table.append(PolynomialVector(derivatives, spin))
 	
 	self.bounds = [0.0] * len(self.table)
 	self.set_bound()
@@ -769,7 +776,7 @@ class SDP:
 	    
 	    for i in range(0, len(self.table[0].vector)):
 	        new_vector.append(self.table[l].vector[i].subs(delta, p[1]))
-	    extra_vectors.append(SDPVector(new_vector, p[0]))
+	    extra_vectors.append(PolynomialVector(new_vector, p[0]))
 	self.table += extra_vectors
 	
 	doc = xml.dom.minidom.Document()
