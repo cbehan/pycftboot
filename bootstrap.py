@@ -440,7 +440,6 @@ class ConformalBlockTable:
 	    return
 	
 	small_table = ConformalBlockTableSeed(dim, l_max, min(m_max + 2 * n_max, 3), 0, kept_pole_order, odd_spins)
-	#small_table = ConformalBlockTableSeed(dim, l_max, m_max + 2 * n_max, 0, kept_pole_order, odd_spins)
 	self.m_order = small_table.m_order
 	self.n_order = small_table.n_order
 	self.table = small_table.table
@@ -494,12 +493,17 @@ class ConformalBlockTable:
 		        prefactor *= (m - 4 - k)
 			prefactor /= k + 1
 		    
-		    for k in range(max(4 + i - m, 0), 5):
+		    k = max(4 + i - m, 0)
+		    while k <= 4 and index <= (m - 4):
 		        coeff += prefactor * poly_derivs[k][index]
 			prefactor *= (m - 4 - index)
 			prefactor /= (index + 1)
 			index += 1
-		    new_deriv -= coeff.subs(l, small_table.table[j].spin) * self.table[j].vector[i]
+			k += 1
+		    
+		    if type(coeff) != type(1):
+		        coeff = coeff.subs(l, small_table.table[j].spin)
+		    new_deriv -= coeff * self.table[j].vector[i]
 		
 		new_deriv = new_deriv / poly_derivs[4][0]
 		self.table[j].vector.append(new_deriv.expand())
@@ -554,13 +558,6 @@ class ConformalBlockTable:
     
     def dump(self, name):
         dump_table_conents(self, name)
-    
-    # Since a = 1 at the crossing point, substituting this is the same as adding the coefficients
-    def coeff_sum(self, poly):
-        ret = 0
-	for p in poly:
-	    ret += p
-	return ret
 
 class ConvolvedBlockTable:
     def __init__(self, block_table, odd_spins = True, symmetric = False):
