@@ -439,62 +439,70 @@ class ConformalBlockTable:
 	    exec command
 	    return
 	
-	#small_table = ConformalBlockTableSeed(dim, l_max, min(m_max + 2 * n_max, 3), 0, kept_pole_order, odd_spins)
-	small_table = ConformalBlockTableSeed(dim, l_max, m_max + 2 * n_max, 0, kept_pole_order, odd_spins)
+	small_table = ConformalBlockTableSeed(dim, l_max, min(m_max + 2 * n_max, 3), 0, kept_pole_order, odd_spins)
+	#small_table = ConformalBlockTableSeed(dim, l_max, m_max + 2 * n_max, 0, kept_pole_order, odd_spins)
 	self.m_order = small_table.m_order
 	self.n_order = small_table.n_order
 	self.table = small_table.table
 	
+	a = symbols('a')
 	l = symbols('l')
 	nu = eval_mpfr(sympy.Rational(dim, 2) - 1, prec)
 	c_2 = (l * (l + 2 * nu) + delta * (delta - 2 * nu - 2)) / 2
 	c_4 = l * (l + 2 * nu) * (delta - 1) * (delta - 2 * nu - 1)
-	polys = [[], [], [], [], [], []]
+	polys = [0, 0, 0, 0, 0]
+	poly_derivs = [[], [], [], [], []]
 	delta_prod = 0
 	delta_sum = 0
 	
 	# Polynomial 0 goes with the lowest order derivative on the right hand side
-	# Polynomial 4 goes with the highest order derivative on the right hand side
-	# Polynomial 5 goes with the derivative for which we are solving
-	polys[0] = [0, 0, 0]
-	polys[1].append(16 * c_2 * (2 * nu + 1) - 8 * c_4)
-	polys[1].append(4 * (c_4 + 2 * (2 * nu + 1) * (c_2 * delta_sum - c_2 + nu * delta_prod)))
-	polys[1].append(2 * (delta_sum - nu) * (c_2 * (2 * delta_sum - 1) + delta_prod * (6 * nu - 1)))
-	polys[1].append(2 * delta_prod * (delta_sum - nu) * (delta_sum - nu + 1))
-	polys[2].append(0)
-	polys[2].append(-16 * c_2 * (2 * nu + 1))
-	polys[2].append(4 * delta_prod - 24 * nu * delta_prod + 8 * nu * (2 * nu - 1) * (2 * delta_sum + 1) + 4 * c_2 * (1 - 4 * delta_sum + 6 * nu))
-	polys[2].append(2 * c_2 * (4 * delta_sum - 2 * nu + 1) + 4 * (2 * nu - 1) * (2 * delta_sum + 1) * (delta_sum - nu + 1) + 2 * delta_prod * (10 * nu - 5 - 4 * delta_sum))
-	polys[2].append((delta_sum - nu + 1) * (4 * delta_prod + (2 * delta_sum + 1) * (delta_sum - nu + 2)))
-	polys[3].append(0)
-	polys[3].append(0)
-	polys[3].append(16 * c_2 + 16 * nu - 32 * nu * nu)
-	polys[3].append(8 * delta_prod - 8 * (3 * delta_sum - nu + 3) * (2 * nu - 1) - 16 * c_2 - 8 * nu + 16 * nu * nu)
-	polys[3].append(4 * (c_2 - delta_prod + (3 * delta_sum - nu + 3) * (2 * nu - 1)) - 4 * delta_prod - 2 * (delta_sum - nu + 2) * (5 * delta_sum - nu + 5))
-	polys[3].append(2 * delta_prod + (delta_sum - nu + 2) * (5 * delta_sum - nu + 5))
-	polys[4].append(0)
-	polys[4].append(0)
-	polys[4].append(0)
-	polys[4].append(32 * nu - 16)
-	polys[4].append(16 - 32 * nu + 4 * (4 * delta_sum - 2 * nu + 7))
-	polys[4].append(4 * (2 * nu - 1) - 4 * (4 * delta_sum - 2 * nu + 7))
-	polys[4].append(4 * delta_sum - 2 * nu + 7)
-	polys[5] = [0, 0, 0, 0, -8, 12, -6, 1]
+	# Polynomial 3 goes with the highest order derivative on the right hand side
+	# Polynomial 4 goes with the derivative for which we are solving
+	polys[0] += (a ** 0) * (16 * c_2 * (2 * nu + 1) - 8 * c_4)
+	polys[0] += (a ** 1) * (4 * (c_4 + 2 * (2 * nu + 1) * (c_2 * delta_sum - c_2 + nu * delta_prod)))
+	polys[0] += (a ** 2) * (2 * (delta_sum - nu) * (c_2 * (2 * delta_sum - 1) + delta_prod * (6 * nu - 1)))
+	polys[0] += (a ** 3) * (2 * delta_prod * (delta_sum - nu) * (delta_sum - nu + 1))
+	polys[1] += (a ** 1) * (-16 * c_2 * (2 * nu + 1))
+	polys[1] += (a ** 2) * (4 * delta_prod - 24 * nu * delta_prod + 8 * nu * (2 * nu - 1) * (2 * delta_sum + 1) + 4 * c_2 * (1 - 4 * delta_sum + 6 * nu))
+	polys[1] += (a ** 3) * (2 * c_2 * (4 * delta_sum - 2 * nu + 1) + 4 * (2 * nu - 1) * (2 * delta_sum + 1) * (delta_sum - nu + 1) + 2 * delta_prod * (10 * nu - 5 - 4 * delta_sum))
+	polys[1] += (a ** 4) * ((delta_sum - nu + 1) * (4 * delta_prod + (2 * delta_sum + 1) * (delta_sum - nu + 2)))
+	polys[2] += (a ** 2) * (16 * c_2 + 16 * nu - 32 * nu * nu)
+	polys[2] += (a ** 3) * (8 * delta_prod - 8 * (3 * delta_sum - nu + 3) * (2 * nu - 1) - 16 * c_2 - 8 * nu + 16 * nu * nu)
+	polys[2] += (a ** 4) * (4 * (c_2 - delta_prod + (3 * delta_sum - nu + 3) * (2 * nu - 1)) - 4 * delta_prod - 2 * (delta_sum - nu + 2) * (5 * delta_sum - nu + 5))
+	polys[2] += (a ** 5) * (2 * delta_prod + (delta_sum - nu + 2) * (5 * delta_sum - nu + 5))
+	polys[3] += (a ** 3) * (32 * nu - 16)
+	polys[3] += (a ** 4) * (16 - 32 * nu + 4 * (4 * delta_sum - 2 * nu + 7))
+	polys[3] += (a ** 5) * (4 * (2 * nu - 1) - 4 * (4 * delta_sum - 2 * nu + 7))
+	polys[3] += (a ** 6) * (4 * delta_sum - 2 * nu + 7)
+	polys[4] += (a ** 7) - 6 * (a ** 6) + 12 * (a ** 5) - 8 * (a ** 4)
+	
+	# Store all possible derivatives of these polynomials
+	for i in range(0, 5):
+	    for j in range(0, i + 4):
+	        poly_derivs[i].append(polys[i].subs(a, 1))
+		polys[i] = polys[i].diff(a)
 
 	for m in range(self.m_order[-1] + 1, m_max + 2 * n_max + 1):
 	    for j in range(0, len(small_table.table)):
 		new_deriv = 0
-		for i in range(max(m - 5, 0), m):
-		    new_deriv -= self.coeff_sum(polys[i + 5 - m]).subs(l, small_table.table[j].spin) * self.table[j].vector[i]
+		for i in range(m - 1, max(m - 8, -1), -1):
+		    coeff = 0
+		    index = max(m - i - 4, 0)
+		    
+		    prefactor = eval_mpfr(1, prec)
+		    for k in range(0, index):
+		        prefactor *= (m - 4 - k)
+			prefactor /= k + 1
+		    
+		    for k in range(max(4 + i - m, 0), 5):
+		        coeff += prefactor * poly_derivs[k][index]
+			prefactor *= (m - 4 - index)
+			prefactor /= (index + 1)
+			index += 1
+		    new_deriv -= coeff.subs(l, small_table.table[j].spin) * self.table[j].vector[i]
 		
-		new_deriv = new_deriv / self.coeff_sum(polys[5])
+		new_deriv = new_deriv / poly_derivs[4][0]
 		self.table[j].vector.append(new_deriv.expand())
-	    
-	    # We store individual coefficients instead of just their sums
-	    # This is to keep track of how a derivative of the whole equation rearranges them
-	    for j in range(0, 5):
-		for i in range(0, len(polys[j])):
-		    polys[j][i] += (i + 1) * polys[j + 1][i + 1]
 	    
 	    self.m_order.append(m)
 	    self.n_order.append(0)
@@ -522,20 +530,20 @@ class ConformalBlockTable:
 		    new_deriv = 0
 		    
 		    if m > 0:
-		        new_deriv += coeff1 * self.table[j][index_map[n][m - 1]]
+		        new_deriv += coeff1 * self.table[j].vector[index_map[n][m - 1]]
 		    if m > 1:
-		        new_deriv += coeff2 * self.table[j][index_map[n][m - 2]]
+		        new_deriv += coeff2 * self.table[j].vector[index_map[n][m - 2]]
 		    if m > 2:
-		        new_deriv += coeff3 * self.table[j][index_map[n][m - 3]]
+		        new_deriv += coeff3 * self.table[j].vector[index_map[n][m - 3]]
 		    
-		    new_deriv += coeff4 * self.table[j][index_map[n - 1][m + 2]]
-		    new_deriv += coeff5 * self.table[j][index_map[n - 1][m + 1]]
-		    new_deriv += coeff6.subs(l, small_table.table[j].spin) * self.table[j][index_map[n - 1][m]]
-		    new_deriv += coeff7 * self.table[j][index_map[n - 1][m - 1]]
+		    new_deriv += coeff4 * self.table[j].vector[index_map[n - 1][m + 2]]
+		    new_deriv += coeff5 * self.table[j].vector[index_map[n - 1][m + 1]]
+		    new_deriv += coeff6.subs(l, small_table.table[j].spin) * self.table[j].vector[index_map[n - 1][m]]
+		    new_deriv += coeff7 * self.table[j].vector[index_map[n - 1][m - 1]]
 		    
 		    if n > 1:
-		        new_deriv += coeff8 * self.table[j][index_map[n - 2][m + 2]]
-			new_deriv += coeff9 * self.table[j][index_map[n - 2][m + 1]]
+		        new_deriv += coeff8 * self.table[j].vector[index_map[n - 2][m + 2]]
+			new_deriv += coeff9 * self.table[j].vector[index_map[n - 2][m + 1]]
 		    
 		    new_deriv = new_deriv / (2 - 4 * n - 4 * nu)
 		    self.table[j].vector.append(new_deriv.expand())
