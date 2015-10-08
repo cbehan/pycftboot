@@ -95,11 +95,11 @@ def dump_table_contents(block_table, name):
     
     for l in range(0, len(block_table.table)):
         dump_file.write("derivatives = []\n")
-        for i in range(0, len(block_table.table[0])):
+        for i in range(0, len(block_table.table[0].vector)):
             poly_string = block_table.table[l].vector[i].__str__()
 	    poly_string = re.sub("([0-9]+\.[0-9]+e?-?[0-9]+)", r"eval_mpfr(\1, prec)", poly_string)
             dump_file.write("derivatives.append(" + poly_string + ")\n")
-	    dump_file.write("self.table.append(PolynomialVector(derivatives, " + block_table[l].spin.__str__() + "))\n")
+	dump_file.write("self.table.append(PolynomialVector(derivatives, [" + block_table.table[l].label[0].__str__() + ", 0]))\n")
 
     dump_file.close()
 
@@ -296,9 +296,11 @@ class ConformalBlockVector:
 	    self.chunks.append(s_sub.mul_matrix(meromorphic_block.chunks[i]))
 
 class PolynomialVector:
-    def __init__(self, derivatives, l):
+    def __init__(self, derivatives, spin_irrep):
+        if type(spin_irrep) == type(1):
+	    spin_irrep = [spin_irrep, 0]
         self.vector = derivatives
-	self.spin = l
+	self.label = spin_irrep
 
 class ConformalBlockTableSeed:
     def __init__(self, dim, l_max, m_max, n_max, kept_pole_order, odd_spins = False, name = None):
@@ -327,7 +329,7 @@ class ConformalBlockTableSeed:
 	print "Preparing blocks"
 	for l in range(0, l_max + 1, step):
 	    conformal_blocks.append(ConformalBlockVector(dim, l, m_max + 2 * n_max, kept_pole_order))
-	    self.table.append(PolynomialVector([], l))
+	    self.table.append(PolynomialVector([], [l, 0]))
 	
 	a = symbols('a')
 	b = symbols('b')
@@ -416,7 +418,7 @@ class ConformalBlockTableSeed:
 		order += 1
     
     def dump(self, name):
-        dump_table_conents(self, name)
+        dump_table_contents(self, name)
     
     def deepcopy(self, array):
         ret = []
@@ -497,12 +499,12 @@ class ConformalBlockTable:
 		    while k <= 4 and index <= (m - 4):
 		        coeff += prefactor * poly_derivs[k][index]
 			prefactor *= (m - 4 - index)
-			prefactor /= (index + 1)
+			prefactor /= index + 1
 			index += 1
 			k += 1
 		    
 		    if type(coeff) != type(1):
-		        coeff = coeff.subs(l, small_table.table[j].spin)
+		        coeff = coeff.subs(l, small_table.table[j].label[0])
 		    new_deriv -= coeff * self.table[j].vector[i]
 		
 		new_deriv = new_deriv / poly_derivs[4][0]
@@ -542,7 +544,7 @@ class ConformalBlockTable:
 		    
 		    new_deriv += coeff4 * self.table[j].vector[index_map[n - 1][m + 2]]
 		    new_deriv += coeff5 * self.table[j].vector[index_map[n - 1][m + 1]]
-		    new_deriv += coeff6.subs(l, small_table.table[j].spin) * self.table[j].vector[index_map[n - 1][m]]
+		    new_deriv += coeff6.subs(l, small_table.table[j].label[0]) * self.table[j].vector[index_map[n - 1][m]]
 		    new_deriv += coeff7 * self.table[j].vector[index_map[n - 1][m - 1]]
 		    
 		    if n > 1:
@@ -557,7 +559,7 @@ class ConformalBlockTable:
 		index += 1
     
     def dump(self, name):
-        dump_table_conents(self, name)
+        dump_table_contents(self, name)
 
 class ConvolvedBlockTable:
     def __init__(self, block_table, odd_spins = True, symmetric = False):
@@ -621,67 +623,113 @@ class ConvolvedBlockTable:
 	        for j in range(len(block_table.table[0].vector) - 1, 0, -1):
 		    deriv = deriv.subs(symbol_array[block_table.n_order[j]][block_table.m_order[j]], block_table.table[l].vector[j])
 		new_derivs.append(2 * deriv.subs(symbol_array[0][0], block_table.table[l].vector[0]))
-	    self.table.append(PolynomialVector(new_derivs, block_table.table[l].spin))
+	    self.table.append(PolynomialVector(new_derivs, block_table.table[l].label))
 
 class SDP:
-    def __init__(self, conv_block_table, dim_ext):
+    def __init__(self, dim_ext, conv_block_table_anti, conv_block_table_symm = None, vector_types = [[[[1, -1]], 0, 0]]):
         # Same story here
-        self.dim = conv_block_table.dim
-	self.l_max = conv_block_table.l_max
-	self.m_max = conv_block_table.m_max
-	self.n_max = conv_block_table.n_max
-	self.kept_pole_order = conv_block_table.kept_pole_order
-	self.odd_spins = conv_block_table.odd_spins
+        self.dim = conv_block_table_anti.dim
+	self.l_max = conv_block_table_anti.l_max
+	self.m_max = conv_block_table_anti.m_max
+	self.n_max = conv_block_table_anti.n_max
+	self.kept_pole_order = conv_block_table_anti.kept_pole_order
+	self.odd_spins = False
 	
-	self.m_order = conv_block_table.m_order
-	self.n_order = conv_block_table.n_order
+	# Just in case these are different
+	if conv_block_table_symm != None:
+	    self.l_max = max(self.l_max, conv_block_table_symm.l_max)
+	    self.m_max = max(self.m_max, conv_block_table_symm.m_max)
+	    self.n_max = max(self.n_max, conv_block_table_symm.n_max)
+	    self.kept_pole_order = max(self.kept_pole_order, conv_block_table_symm.kept_pole_order)
+	
+	self.points = []
+	self.m_order = []
+	self.n_order = []
 	self.table = []
 	self.unit = []
-	self.points = []
 	
-	for i in range(0, len(conv_block_table.table[0].vector)):
-	    unit = conv_block_table.unit[i].subs(delta_ext, dim_ext)
-	    self.unit.append(unit)
-
-	for l in range(0, len(conv_block_table.table)):
+	# We must assume the 0th element put in vector_types corresponds to the singlet channel
+	# This is because we must harvest the identity from it
+	for pair in vector_types[0][0]:
+	    if pair[1] == -1:
+	        tab = conv_block_table_anti
+	    else:
+	        tab = conv_block_table_symm
+	    
+	    for i in range(0, len(tab.unit)):
+	        unit = pair[0] * tab.unit[i].subs(delta_ext, dim_ext)
+		self.m_order.append(tab.m_order[i])
+		self.n_order.append(tab.n_order[i])
+		self.unit.append(unit)
+	
+	# Looping over types and spins gives "0 - S", "0 - T", "1 - A" and so on
+	for vec in vector_types:
+	    if (vec[1] % 2) == 1:
+	        self.odd_spins = True
+	        start = 1
+	    else:
+	        start = 0
+	    
 	    derivatives = []
-	    for i in range(0, len(conv_block_table.table[l].vector)):
-	        derivatives.append(conv_block_table.table[l].vector[i].subs(delta_ext, dim_ext))
-	    self.table.append(PolynomialVector(derivatives, conv_block_table.table[l].spin))
+	    for l in range(start, self.l_max, 2):
+	        derivatives = []
+	        # This loop switches between adding F derivatives and adding H derivatives
+	        for pair in vec[0]:
+		    if pair[1] == -1:
+		        tab = conv_block_table_anti
+		    else:
+		        tab = conv_block_table_symm
+		    
+		    if tab.odd_spins:
+		        index = l
+		    else:
+		        index = l / 2
+		    
+		    for i in range(0, len(tab.table[index].vector)):
+		        derivatives.append(pair[0] * tab.table[index].vector[i].subs(delta_ext, dim_ext))
+	        self.table.append(PolynomialVector(derivatives, [l, vec[2]]))
 	
 	self.bounds = [0.0] * len(self.table)
 	self.set_bound()
     
-    def add_point(self, spin, dimension):
-        self.points.append((spin, dimension))
+    def add_point(self, spin_irrep, dimension):
+        if type(spin_irrep) == type(1):
+	    spin_irrep = [spin_irrep, 0]
+        self.points.append((spin_irrep, dimension))
     
     # Defaults to unitarity bounds if there are missing arguments
-    def set_bound(self, gapped_spin = -1, delta_min = -1):
-        if gapped_spin == -1:
-	    self.bounds[0] = sympy.Rational(self.dim, 2) - 1
-	    for l in range(1, len(self.bounds)):
-	        if self.odd_spins:
-		    spin = l
+    def set_bound(self, gapped_spin_irrep = -1, delta_min = -1):
+        if gapped_spin_irrep == -1:
+	    for l in range(0, len(self.table)):
+	        spin = self.table[l].label[0]
+		if spin == 0:
+		    self.bounds[l] = sympy.Rational(self.dim, 2) - 1
 		else:
-		    spin = 2 * l
-	        self.bounds[l] = self.dim + spin - 2
+		    self.bounds[l] = self.dim + spin - 2
 	else:
-	    if self.odd_spins:
-	        l = gapped_spin
-	    else:
-	        l = gapped_spin / 2
+	    if type(gapped_spin_irrep) == type(1):
+	        gapped_spin_irrep = [gapped_spin_irrep, 0]
 	    
-	    if delta_min == -1 and l == 0:
-	        self.bounds[0] = sympy.Rational(self.dim, 2) - 1
+	    for l in range(0, len(self.table)):
+	        if self.table[l].label == gapped_spin_irrep:
+		    break
+	    spin = gapped_spin_irrep[0]
+	    
+	    if delta_min == -1 and spin == 0:
+	        self.bounds[l] = sympy.Rational(self.dim, 2) - 1
 	    elif delta_min == -1:
-	        self.bounds[l] = self.dim + gapped_spin - 2
+	        self.bounds[l] = self.dim + spin - 2
 	    else:
 	        self.bounds[l] = delta_min
     
     # Translate between the mathematica definition and the bootstrap definition of SDP
     def reshuffle_with_normalization(self, vector, norm):
-        max_index = 0
-	#max_index = norm.index(max(norm, key = abs))
+	norm_hack = []
+	for el in norm:
+	    norm_hack.append(float(el))
+	
+	#max_index = 0
+	max_index = norm_hack.index(max(norm_hack, key = abs))
 	const = vector[max_index] / norm[max_index]
 	ret = []
 	
@@ -774,12 +822,11 @@ class SDP:
 	print "Adding isolated points"
 	for p in self.points:
 	    new_vector = []
-	    if self.odd_spins:
-	        l = p[0]
-	    else:
-	        l = p[0] / 2
+	    for l in range(0, len(self.table)):
+	        if self.table[l].label == p[0]:
+	            break
 	    
-	    for i in range(0, len(self.table[0].vector)):
+	    for i in range(0, len(self.table[l].vector)):
 	        new_vector.append(self.table[l].vector[i].subs(delta, p[1]))
 	    extra_vectors.append(PolynomialVector(new_vector, p[0]))
 	self.table += extra_vectors
@@ -828,6 +875,8 @@ class SDP:
 		else:
 		    coeff_list = sorted(expression.args, key = self.extract_power)
 		degree = max(degree, len(coeff_list) - 1)
+		if coeff_list == []:
+		    coeff_list = [0.0]
 		
 	        polynomial_node = doc.createElement("polynomial")
 		for d in range(0, len(coeff_list)):
@@ -843,7 +892,7 @@ class SDP:
 	    elements_node.appendChild(vector_node)
 	    
 	    print "Getting points"
-	    poles = get_poles(self.dim, self.table[j].spin, self.kept_pole_order)
+	    poles = get_poles(self.dim, self.table[j].label[0], self.kept_pole_order)
 	    index = self.get_index(laguerre_degrees, degree)
 	    if j >= len(self.bounds):
 	        points = [self.points[j - len(self.bounds)][1]]
@@ -908,14 +957,17 @@ class SDP:
 	xml_file.close()
 	doc.unlink()
     
-    def bisect(self, lower, upper, threshold, spin):
+    def bisect(self, lower, upper, threshold, spin_irrep):
+        if type(spin_irrep) == type(1):
+	    spin_irrep = [spin_irrep, 0]
+	
         test = (lower + upper) / 2.0
         if abs(upper - lower) < threshold:
 	    return lower
 	else:
 	    print "Trying " + str(test)
 	    obj = [0.0] * len(self.table[0].vector)
-	    self.set_bound(spin, test)
+	    self.set_bound(spin_irrep, test)
 	    self.write_xml(obj, self.unit)
 	    os.spawnlp(os.P_WAIT, "/usr/bin/sdpb", "sdpb", "-s", "mySDP.xml", "--findPrimalFeasible", "--findDualFeasible", "--noFinalCheckpoint")
 	    out_file = open("mySDP.out", 'r')
@@ -924,21 +976,22 @@ class SDP:
 	    out_file.close()
 	    
 	    if terminate_reason == '"found dual feasible solution";\n':
-	        return self.bisect(lower, test, threshold, spin)
+	        return self.bisect(lower, test, threshold, spin_irrep)
 	    else:
-	        return self.bisect(test, upper, threshold, spin)
+	        return self.bisect(test, upper, threshold, spin_irrep)
     
-    def opemax(self, dimension, spin):
-        if self.odd_spins:
-	    j = spin
-	else:
-	    j = spin / 2
+    def opemax(self, dimension, spin_irrep):
+        if type(spin_irrep) == type(1):
+	    spin_irrep = [spin_irrep, 0]
+	
+	for l in range(0, len(self.table)):
+	    if self.table[l].label == spin_irrep:
+	        break
 	
 	norm = []
-	for i in range(0, len(self.table[j])):
-	    norm.append(self.table[j].vector[i].subs(delta, dimension))
+	for i in range(0, len(self.table[l])):
+	    norm.append(self.table[l].vector[i].subs(delta, dimension))
 	
-	# Impose no gap
 	self.write_xml(self.unit, norm)
 	os.spawnlp(os.P_WAIT, "/usr/bin/sdpb", "sdpb", "-s", "mySDP.xml", "--noFinalCheckpoint")
 	out_file = open("mySDP.out", 'r')
