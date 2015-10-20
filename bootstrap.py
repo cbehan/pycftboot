@@ -989,7 +989,7 @@ class SDP:
 	        break
 	
 	norm = []
-	for i in range(0, len(self.table[l])):
+	for i in range(0, len(self.table[l].vector)):
 	    norm.append(self.table[l].vector[i].subs(delta, dimension))
 	
 	self.write_xml(self.unit, norm)
