@@ -697,6 +697,11 @@ class SDP:
 	    spin_irrep = [spin_irrep, 0]
         self.points.append((spin_irrep, dimension))
     
+    def get_bound(self, gapped_spin_irrep):
+        for l in range(0, len(self.table)):
+	        if self.table[l].label == gapped_spin_irrep:
+		    return self.bounds[l]
+    
     # Defaults to unitarity bounds if there are missing arguments
     def set_bound(self, gapped_spin_irrep = -1, delta_min = -1):
         if gapped_spin_irrep == -1:
@@ -967,8 +972,12 @@ class SDP:
 	else:
 	    print "Trying " + str(test)
 	    obj = [0.0] * len(self.table[0].vector)
+	    
+	    old = self.get_bound(spin_irrep)
 	    self.set_bound(spin_irrep, test)
 	    self.write_xml(obj, self.unit)
+	    self.set_bound(spin_irrep, old)
+	    
 	    os.spawnlp(os.P_WAIT, "/usr/bin/sdpb", "sdpb", "-s", "mySDP.xml", "--findPrimalFeasible", "--findDualFeasible", "--noFinalCheckpoint")
 	    out_file = open("mySDP.out", 'r')
 	    terminate_line = out_file.next()
