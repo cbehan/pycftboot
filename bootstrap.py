@@ -1,5 +1,6 @@
 #!/usr/bin/env python2
 import xml.dom.minidom
+import numpy.polynomial
 import mpmath
 import re
 import os
@@ -971,8 +972,8 @@ class SDP:
 	    return lower
 	else:
 	    print "Trying " + str(test)
-	    obj = [0.0] * len(self.table[0].vector)
 	    
+	    obj = [0.0] * len(self.table[0].vector)
 	    old = self.get_bound(spin_irrep)
 	    self.set_bound(spin_irrep, test)
 	    self.write_xml(obj, self.unit)
@@ -1010,3 +1011,60 @@ class SDP:
 	
 	primal_value = primal_line.partition(" = ")[-1][:-2]
 	return float(primal_value)
+    
+    def solution_functional(self, dimension, spin_irrep):
+        if type(spin_irrep) == type(1):
+	    spin_irrep = [spin_irrep, 0]
+	
+	obj = [0.0] * len(self.table[0].vector)
+	old = self.get_bound(spin_irrep)
+	self.set_bound(spin_irrep, dimension)
+	self.write_xml(obj, self.unit)
+	self.set_bound(spin_irrep, old)
+	
+	os.spawnlp(os.P_WAIT, "/usr/bin/sdpb", "sdpb", "-s", "mySDP.xml", "--noFinalCheckpoint")
+	out_file = open("mySDP.out", 'r')
+	for i in range(0, 7):
+	    out_file.next()
+	y_line = out_file.next()
+	y_line = y_line.partition(" = ")[-1][1:-3]
+	
+	component_strings = y_line.split(", ")
+	components = [eval_mpfr(1.0, prec)]
+	for num in component_strings:
+	    command = "components.append(eval_mpfr(" + num + ", prec))"
+	    exec command
+	
+	return PolynomialVector(components, [0, 0])
+    
+    def extremal_dimensions(self, functional, spin_irrep):
+        if type(spin_irrep) == type(1):
+	    spin_irrep = [spin_irrep, 0]
+	
+	for l in range(0, len(self.table)):
+	    if self.table[l].label == spin_irrep:
+	        break
+	
+	inner_product = 0.0
+	polynomial_vector = self.reshuffle_with_normalization(self.table[l].vector, self.unit)
+	
+	for i in range(0, len(self.table[l].vector)):
+	    inner_product += functional.vector[i] * polynomial_vector[i]
+	    inner_product = inner_product.expand()
+	
+	if type(inner_product) == type(eval_mpfr(1, 10)):
+	    coeff_list = [inner_product]
+	else:
+	    coeff_list = sorted(inner_product.args, key = self.extract_power)
+	if coeff_list == []:
+	    coeff_list = [0.0]
+	
+	coeffs = []
+	for d in range(0, len(coeff_list)):
+	    if d == 0:
+	        coeffs.append(float(coeff_list[0]))
+	    else:
+	        coeffs.append(float(coeff_list[d].args[0]))
+	
+	poly = numpy.polynomial.Polynomial(coeffs)
+	return poly.roots()
