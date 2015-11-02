@@ -1067,4 +1067,11 @@ class SDP:
 	        coeffs.append(float(coeff_list[d].args[0]))
 	
 	poly = numpy.polynomial.Polynomial(coeffs)
-	return poly.roots()
+	roots = poly.roots()
+	
+	ret = []
+	bound = self.get_bound(spin_irrep)
+	for dim in roots:
+	    if dim == dim.conj() and dim.real > (bound - 0.01):
+	        ret.append(dim.real)
+	return
