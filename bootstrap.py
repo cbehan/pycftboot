@@ -1037,6 +1037,28 @@ class SDP:
 	
 	return PolynomialVector(components, [0, 0])
     
+    def extremal_coefficients(self, dimensions, spin_irreps):
+        zeros = min(len(dimensions), len(spin_irreps))
+	for i in range(0, zeros):
+	    if type(spin_irreps[i]) == type(1):
+	        spin_irreps[i] = [spin_irreps[i], 0]
+	
+	extremal_blocks = []
+	for i in range(0, zeros):
+	    for j in range(0, zeros):
+	        for l in range(0, len(self.table)):
+		    if self.table[l].label == spin_irreps[j]:
+	                break
+		
+		polynomial_vector = self.table[l].vector[i].subs(delta, dimensions[j])
+		extremal_blocks.append(float(polynomial_vector))
+	
+	identity = DenseMatrix(zeros, 1, self.unit)
+	extremal_matrix = DenseMatrix(zeros, zeros, extremal_blocks)
+	inverse = extremal_matrix.inv()
+	
+	return inverse.mul_matrix(identity)
+    
     def extremal_dimensions(self, functional, spin_irrep):
         if type(spin_irrep) == type(1):
 	    spin_irrep = [spin_irrep, 0]
@@ -1074,4 +1096,4 @@ class SDP:
 	for dim in roots:
 	    if dim == dim.conj() and dim.real > (bound - 0.01):
 	        ret.append(dim.real)
-	return
+	return ret
