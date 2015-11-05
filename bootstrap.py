@@ -109,10 +109,10 @@ def dump_table_contents(block_table, name):
     dump_file = open(name, 'w')
 
     dump_file.write("self.dim = " + block_table.dim.__str__() + "\n")
+    dump_file.write("self.k_max = " + block_table.k_max.__str__() + "\n")
     dump_file.write("self.l_max = " + block_table.l_max.__str__() + "\n")
     dump_file.write("self.m_max = " + block_table.m_max.__str__() + "\n")
     dump_file.write("self.n_max = " + block_table.n_max.__str__() + "\n")
-    dump_file.write("self.kept_pole_order = " + block_table.kept_pole_order.__str__() + "\n")
     dump_file.write("self.odd_spins = " + block_table.odd_spins.__str__() + "\n")
     dump_file.write("self.m_order = " + block_table.m_order.__str__() + "\n")
     dump_file.write("self.n_order = " + block_table.n_order.__str__() + "\n")
@@ -327,12 +327,12 @@ class PolynomialVector:
 	self.label = spin_irrep
 
 class ConformalBlockTableSeed:
-    def __init__(self, dim, l_max, m_max, n_max, kept_pole_order, delta_12 = 0, delta_34 = 0, odd_spins = False, name = None):
+    def __init__(self, dim, k_max, l_max, m_max, n_max, delta_12 = 0, delta_34 = 0, odd_spins = False, name = None):
 	self.dim = dim
+	self.k_max = k_max
 	self.l_max = l_max
 	self.m_max = m_max
 	self.n_max = n_max
-	self.kept_pole_order = kept_pole_order
 	self.odd_spins = odd_spins
 	self.m_order = []
 	self.n_order = []
@@ -352,7 +352,7 @@ class ConformalBlockTableSeed:
 	
 	print "Preparing blocks"
 	for l in range(0, l_max + 1, step):
-	    conformal_blocks.append(ConformalBlockVector(dim, l, delta_12, delta_34, m_max + 2 * n_max, kept_pole_order))
+	    conformal_blocks.append(ConformalBlockVector(dim, l, delta_12, delta_34, m_max + 2 * n_max, k_max))
 	    self.table.append(PolynomialVector([], [l, 0]))
 	
 	a = symbols('a')
@@ -451,12 +451,12 @@ class ConformalBlockTableSeed:
 	return ret
 
 class ConformalBlockTable:
-    def __init__(self, dim, l_max, m_max, n_max, kept_pole_order, delta_12 = 0, delta_34 = 0, odd_spins = False, name = None):
+    def __init__(self, dim, k_max, l_max, m_max, n_max, delta_12 = 0, delta_34 = 0, odd_spins = False, name = None):
 	self.dim = dim
+	self.k_max = k_max
 	self.l_max = l_max
 	self.m_max = m_max
 	self.n_max = n_max
-	self.kept_pole_order = kept_pole_order
 	self.odd_spins = odd_spins
 	
 	if name != None:
@@ -465,7 +465,7 @@ class ConformalBlockTable:
 	    exec command
 	    return
 	
-	small_table = ConformalBlockTableSeed(dim, l_max, min(m_max + 2 * n_max, 3), 0, kept_pole_order, delta_12, delta_34, odd_spins)
+	small_table = ConformalBlockTableSeed(dim, l_max, min(m_max + 2 * n_max, 3), 0, k_max, delta_12, delta_34, odd_spins)
 	self.m_order = small_table.m_order
 	self.n_order = small_table.n_order
 	self.table = small_table.table
@@ -589,11 +589,11 @@ class ConvolvedBlockTable:
     def __init__(self, block_table, odd_spins = True, symmetric = False):
         # Copying everything but the unconvolved table is fine from a memory standpoint
         self.dim = block_table.dim
+	self.k_max = block_table.k_max
 	self.l_max = block_table.l_max
 	self.m_max = block_table.m_max
 	self.n_max = block_table.n_max
-	self.kept_pole_order = block_table.kept_pole_order
-	
+		
 	self.m_order = []
 	self.n_order = []
 	self.table = []
@@ -653,18 +653,18 @@ class SDP:
     def __init__(self, dim_ext, conv_block_table_anti, conv_block_table_symm = None, vector_types = [[[[1, -1]], 0, 0]]):
         # Same story here
         self.dim = conv_block_table_anti.dim
+	self.k_max = conv_block_table_anti.k_max
 	self.l_max = conv_block_table_anti.l_max
 	self.m_max = conv_block_table_anti.m_max
 	self.n_max = conv_block_table_anti.n_max
-	self.kept_pole_order = conv_block_table_anti.kept_pole_order
 	self.odd_spins = False
 	
 	# Just in case these are different
 	if conv_block_table_symm != None:
+	    self.k_max = max(self.k_max, conv_block_table_symm.k_max)
 	    self.l_max = max(self.l_max, conv_block_table_symm.l_max)
 	    self.m_max = max(self.m_max, conv_block_table_symm.m_max)
 	    self.n_max = max(self.n_max, conv_block_table_symm.n_max)
-	    self.kept_pole_order = max(self.kept_pole_order, conv_block_table_symm.kept_pole_order)
 	
 	self.points = []
 	self.m_order = []
@@ -921,7 +921,7 @@ class SDP:
 	    elements_node.appendChild(vector_node)
 	    
 	    print "Getting points"
-	    poles = get_poles(self.dim, self.table[j].label[0], 0, 0, self.kept_pole_order)
+	    poles = get_poles(self.dim, self.table[j].label[0], 0, 0, self.k_max)
 	    index = self.get_index(laguerre_degrees, degree)
 	    if j >= len(self.bounds):
 	        points = [self.points[j - len(self.bounds)][1]]
