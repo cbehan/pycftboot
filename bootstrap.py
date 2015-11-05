@@ -1058,7 +1058,7 @@ class SDP:
 	    command = "components.append(eval_mpfr(" + num + ", prec))"
 	    exec command
 	
-	return PolynomialVector(components, [0, 0])
+	return components
     
     def extremal_coefficients(self, dimensions, spin_irreps):
         zeros = min(len(dimensions), len(spin_irreps))
@@ -1094,7 +1094,7 @@ class SDP:
 	polynomial_vector = self.reshuffle_with_normalization(self.table[l].vector, self.unit)
 	
 	for i in range(0, len(self.table[l].vector)):
-	    inner_product += functional.vector[i] * polynomial_vector[i]
+	    inner_product += functional[i] * polynomial_vector[i]
 	    inner_product = inner_product.expand()
 	
 	if type(inner_product) == type(eval_mpfr(1, 10)):
