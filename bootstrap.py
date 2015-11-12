@@ -24,6 +24,10 @@ r_cross = eval_mpfr(3 - 2 * sqrt(2), prec)
 
 delta  = symbols('delta')
 delta_ext = symbols('delta_ext')
+aux1 = symbols('aux1')
+aux2 = symbols('aux2')
+aux3 = symbols('aux3')
+auxs = [aux1, aux2, aux3]
 
 def is_nonzero(num):
     if type(num) == type(1.0):
@@ -43,11 +47,12 @@ def delta_pole(nu, k, l, series):
 
 def delta_residue(nu, k, l, delta_12, delta_34, series):
     # Time saving special case
+    two = eval_mpfr(2, prec)
     if series != 2 and k % 2 != 0 and delta_12 == 0 and delta_34 == 0:
         return 0
     
     if series == 1:
-        ret = - ((k * (-4) ** k) / (factorial(k) ** 2)) * sympy.rf((1 - k + delta_12) / 2.0, k) * sympy.rf((1 - k + delta_34) / 2.0, k)
+        ret = - ((k * (-4) ** k) / (factorial(k) ** 2)) * sympy.rf((1 - k + delta_12) / two, k) * sympy.rf((1 - k + delta_34) / two, k)
 	if l == 0 and nu == 0:
 	    # Take l to 0, then nu
 	    return ret * 2
@@ -60,10 +65,11 @@ def delta_residue(nu, k, l, delta_12, delta_34, series):
 	    return - sympy.rf(nu, k) * sympy.rf(1 - nu, k) * (sympy.rf((nu + l + 1 - k) / 2, k) ** 2 / sympy.rf((nu + l - k) / 2, k) ** 2) * (k / factorial(k) ** 2) * ((nu + l - k) / (nu + l + k))
 	else:
             ret = - ((k * (-16) ** k) / (factorial(k) ** 2)) * (sympy.rf(nu - k, 2 * k) / (sympy.rf(l + nu - k, 2 * k) * sympy.rf(l + nu + 1 - k, 2 * k)))
-	    return ret * sympy.rf((1 - k + l + nu + delta_12) / 2.0, k) * sympy.rf((1 - k + l + nu + delta_34) / 2.0, k) * sympy.rf((1 - k + l + nu - delta_12) / 2.0, k) * sympy.rf((1 - k + l + nu - delta_34) / 2.0, k)
+	    return ret * sympy.rf((1 - k + l + nu + delta_12) / two, k) * sympy.rf((1 - k + l + nu + delta_34) / two, k) * sympy.rf((1 - k + l + nu - delta_12) / two, k) * sympy.rf((1 - k + l + nu - delta_34) / two, k)
     else:
-	return - ((k * (-4) ** k) / (factorial(k) ** 2)) * (sympy.rf(1 + l - k, k) * sympy.rf((1 - k + delta_12) / 2.0, k) * sympy.rf((1 - k + delta_34) / 2.0, k) / sympy.rf(1 + nu + l - k, k))
+	return - ((k * (-4) ** k) / (factorial(k) ** 2)) * (sympy.rf(1 + l - k, k) * sympy.rf((1 - k + delta_12) / two, k) * sympy.rf((1 - k + delta_34) / two, k) / sympy.rf(1 + nu + l - k, k))
 
+# We want double poles to show up here
 def get_poles(dim, l, delta_12, delta_34, kept_pole_order):
     nu = sympy.Rational(dim, 2) - 1
 
@@ -156,7 +162,7 @@ class LeadingBlockVector:
 		chunk.append(expression.subs({r : r_cross, eta : 1}))
 	    self.chunks.append(DenseMatrix(len(chunk), 1, chunk))
 
-class MeromorphicBlockVector:
+class OldBlockVector:
     def __init__(self, dim, Delta, l, delta_12, delta_34, derivative_order, kept_pole_order, top, old_pair, old_series):
         global r_powers
 	global dual_poles
@@ -299,25 +305,72 @@ class MeromorphicBlockVector:
 	for i in range(0, derivative_order + 1):
 	    self.chunks.append(summation[i])
 
-class ConformalBlockVector:
-    def __init__(self, dim, l, delta_12, delta_34, derivative_order, kept_pole_order):
-        global s_matrix
+class MeromorphicBlockVector:
+    def __init__(self, leading_block):
 	self.chunks = []
 	
-	# Perhaps poorly named, S keeps track of a linear combination of derivatives
-	# We get this by including the essential singularity, then stripping it off again
-	if s_matrix == []:
-	    s_matrix = DenseMatrix(derivative_order + 1, derivative_order + 1, [0] * ((derivative_order + 1) ** 2))
-	    for i in range(0, derivative_order + 1):
-	        new_element = 1
-	        for j in range(i, -1, -1):
-		    s_matrix.set(i, j, new_element)
-		    new_element *= (j / ((i - j + 1) * r_cross)) * (delta - (i - j))
+	for j in range(0, len(leading_block.chunks)):
+	    rows = leading_block.chunks[j].nrows()
+	    self.chunks.append(DenseMatrix(rows, 1, [0] * rows))
+	    for n in range(0, rows):
+	        self.chunks[j].set(n, 0, leading_block.chunks[j].get(n, 0))
+
+class ConformalBlockVector:
+    def __init__(self, dim, l, delta_12, delta_34, derivative_order, kept_pole_order, s_matrix, leading_block, pol_list, res_list):
+        poles = get_poles(dim, l, delta_12, delta_34, kept_pole_order)
+	nu = sympy.Rational(dim, 2) - 1
 	
-	meromorphic_block = MeromorphicBlockVector(dim, delta, l, delta_12, delta_34, derivative_order, kept_pole_order, True, (0, 0), 0)
-	for i in range(0, derivative_order + 1):
-	    s_sub = s_matrix.submatrix(0, derivative_order - i, 0, derivative_order - i)
-	    self.chunks.append(s_sub.mul_matrix(meromorphic_block.chunks[i]))
+	dual_poles = []
+	self.chunks = []
+	k = 1
+	
+	if dim % 2 == 0:
+	    while (2 * k) <= kept_pole_order:
+	        if k >= nu + l and is_nonzero(delta_residue(nu, k, l, delta_12, delta_34, 2)):
+	            dual_poles.append(delta_pole(nu, k, l, 2))
+	        k += 1
+	
+	old_list = MeromorphicBlockVector(leading_block)
+	for j in range(0, derivative_order + 1):
+	    self.chunks.append(leading_block.chunks[j])
+	    for p in poles:
+	        self.chunks[j] = self.chunks[j].mul_scalar(delta - p)
+	
+	for k in range(0, len(pol_list)):
+	    pole = delta_pole(nu, pol_list[k][1], l, pol_list[k][3])
+	    
+	    for j in range(0, derivative_order + 1):
+	        for n in range(0, old_list.chunks[j].nrows()):
+		    element = res_list[k].chunks[j].get(n, 0)
+		    
+		    if len(element.free_symbols) == 0 and pole in dual_poles:
+		        element = element * (delta - pole)
+		    elif len(element.free_symbols) > 0:
+		        aux = list(element.free_symbols)[0]
+			series = 3
+			
+			# The fact that we pass less information to this class means
+			# we have to infer the sign from which symbol we are replacing
+			if aux == aux1:
+			    series = 1
+			elif aux == aux2:
+			    series = 2
+			
+			sign = sympy.Rational(pol_list[k][3] - series, pol_list[k][3] - 2)
+			element = element.expand()
+			element = element * aux / sign
+			element = element.expand()
+			element = element.subs(aux, sign * (delta - pole))
+		        #element = element.subs(aux, sign)
+		    
+		    old_list.chunks[j].set(n, 0, element)
+	    
+	    for j in range(0, derivative_order + 1):
+	        self.chunks[j] = self.chunks[j].add_matrix(old_list.chunks[j].mul_scalar(omit_all(poles, pole)))
+	
+	for j in range(0, derivative_order + 1):
+	    s_sub = s_matrix.submatrix(0, derivative_order - j, 0, derivative_order - j)
+	    self.chunks[j] = s_sub.mul_matrix(self.chunks[j])
 
 class PolynomialVector:
     def __init__(self, derivatives, spin_irrep):
@@ -342,7 +395,6 @@ class ConformalBlockTableSeed:
 	    step = 1
 	else:
 	    step = 2
-	conformal_blocks = []
 	
 	if name != None:
 	    dump_file = open(name, 'r')
@@ -350,9 +402,140 @@ class ConformalBlockTableSeed:
 	    exec command
 	    return
 	
-	print "Preparing blocks"
+	print "Calculating residues"
+	conformal_blocks = []
+	derivative_order = m_max + 2 * n_max
+	
+	# The matrix for how derivatives are affected when one multiplies by r
+        r_powers = []
+        identity = [0] * ((derivative_order + 1) ** 2)
+        lower_band = [0] * ((derivative_order + 1) ** 2)
+	
+        for i in range(0, derivative_order + 1):
+            identity[i * (derivative_order + 1) + i] = 1
+        for i in range(1, derivative_order + 1):
+            lower_band[i * (derivative_order + 1) + i - 1] = i
+	
+        identity = DenseMatrix(derivative_order + 1, derivative_order + 1, identity)
+        lower_band = DenseMatrix(derivative_order + 1, derivative_order + 1, lower_band)
+        r_matrix = identity.mul_scalar(r_cross).add_matrix(lower_band)
+        r_powers.append(identity)
+        r_powers.append(r_matrix)
+
+        derivative_order = m_max + 2 * n_max
+        nu = sympy.Rational(dim, 2) - 1
+        leading_blocks = []
+        pol_list = []
+        res_list = []
+	new_list = []
+	pow_list = []
+
+        # Find out which residues we will ever need to include
+        for l in range(0, l_max + k_max + 1):
+            lb = LeadingBlockVector(dim, l, delta_12, delta_34, derivative_order)
+            leading_blocks.append(lb)
+            current_pol_list = []
+
+            for k in range(1, k_max + 1):
+	        if l <= l_max:
+                    res = delta_residue(nu, k, l, delta_12, delta_34, 1)
+                    if is_nonzero(res):
+                        current_pol_list.append((k, k, l + k, 1))
+    
+                if (k % 2 == 0) and ((k / 2) < nu + l or dim % 2 != 0):
+                    res = delta_residue(nu, k / 2, l, delta_12, delta_34, 2)
+	            if is_nonzero(res):
+	                current_pol_list.append((k, k / 2, l, 2))
+        
+                if k <= l:
+                    res = delta_residue(nu, k, l, delta_12, delta_34, 3)
+	            if is_nonzero(res):
+	                current_pol_list.append((k, k, l - k, 3))
+	    
+	        if l == 0:
+	            r_powers.append(r_powers[k].mul_matrix(r_powers[1]))
+	    
+	    # These are in the format (n, k, l, series)
+            pol_list.append(current_pol_list)
+            res_list.append([])
+	    new_list.append([])
+	    pow_list.append([])
+	
+	old_list = MeromorphicBlockVector(leading_blocks[0])
+	# Initialize the residues at the appropriate leading blocks
+	for l in range(0, l_max + k_max + 1):
+	    for i in range(0, len(pol_list[l])):
+	        l_new = pol_list[l][i][2]
+	        res_list[l].append(MeromorphicBlockVector(leading_blocks[l_new]))
+		
+		new_list[l].append(0)
+		pow_list[l].append(0)
+
+        for k in range(1, k_max + 1):
+            for l in range(0, l_max + k_max + 1):
+                for i in range(0, len(res_list[l])):
+		    if pow_list[l][i] >= k_max:
+		        continue
+		    
+	            res = delta_residue(nu, pol_list[l][i][1], l, delta_12, delta_34, pol_list[l][i][3])
+		    pow_list[l][i] += pol_list[l][i][0]
+		    
+                    for j in range(0, derivative_order + 1):
+	                r_sub = r_powers[pol_list[l][i][0]].submatrix(0, derivative_order - j, 0, derivative_order - j)
+	                res_list[l][i].chunks[j] = r_sub.mul_matrix(res_list[l][i].chunks[j]).mul_scalar(res)
+	    
+            for l in range(0, l_max + k_max + 1):
+                for i in range(0, len(res_list[l])):
+		    if pow_list[l][i] >= k_max:
+		        continue
+		    
+		    l_new = pol_list[l][i][2]
+	            new_list[l][i] = MeromorphicBlockVector(leading_blocks[l_new])
+		    res = delta_residue(nu, pol_list[l][i][1], l, delta_12, delta_34, pol_list[l][i][3])
+		    
+		    for i_new in range(0, len(res_list[l_new])):
+		        pole1 = delta_pole(nu, pol_list[l][i][1], l, pol_list[l][i][3]) + pol_list[l][i][0]
+			pole2 = delta_pole(nu, pol_list[l_new][i_new][1], l_new, pol_list[l_new][i_new][3])
+			
+			# A divergence here means a single pole to be encountered later will become a double pole
+			# As soon as we know which double pole that is, we will substitute
+			if pole1 != pole2:
+			    denom = pole1 - pole2
+			else:
+			    denom = auxs[pol_list[l_new][i_new][3] - 1]
+			
+			# Similarly, check if residues we are already using had this done to them
+			# If so, substitute this pole difference with an appropriate sign
+			sign = sympy.Rational(pol_list[l][i][3] - pol_list[l_new][i_new][3], pol_list[l][i][3] - 2)
+			for j in range(0, derivative_order + 1):
+			    for n in range(0, old_list.chunks[j].nrows()):
+			        element = res_list[l_new][i_new].chunks[j].get(n, 0)
+				if len(element.free_symbols) > 0:
+				    element = element.subs(list(element.free_symbols)[0], (pole1 - pole2) * sign)
+			        old_list.chunks[j].set(n, 0, element)
+			
+                        for j in range(0, derivative_order + 1):
+			    new_list[l][i].chunks[j] = new_list[l][i].chunks[j].add_matrix(old_list.chunks[j].mul_scalar(eval_mpfr(1, prec) / denom))
+	    
+	    for l in range(0, l_max + k_max + 1):
+                for i in range(0, len(res_list[l])):
+		    if pow_list[l][i] >= k_max:
+		        continue
+		    
+		    for j in range(0, derivative_order + 1):
+		         res_list[l][i].chunks[j] = new_list[l][i].chunks[j]
+	
+        # Perhaps poorly named, S keeps track of a linear combination of derivatives
+        # We get this by including the essential singularity, then stripping it off again
+        s_matrix = DenseMatrix(derivative_order + 1, derivative_order + 1, [0] * ((derivative_order + 1) ** 2))
+        for i in range(0, derivative_order + 1):
+            new_element = 1
+            for j in range(i, -1, -1):
+                s_matrix.set(i, j, new_element)
+                new_element *= (j / ((i - j + 1) * r_cross)) * (delta - (i - j))
+	
 	for l in range(0, l_max + 1, step):
-	    conformal_blocks.append(ConformalBlockVector(dim, l, delta_12, delta_34, m_max + 2 * n_max, k_max))
+	    conformal_blocks.append(ConformalBlockVector(dim, l, delta_12, delta_34, m_max + 2 * n_max, k_max, s_matrix, leading_blocks[l], pol_list[l], res_list[l]))
 	    self.table.append(PolynomialVector([], [l, 0]))
 	
 	a = symbols('a')
@@ -465,7 +648,7 @@ class ConformalBlockTable:
 	    exec command
 	    return
 	
-	small_table = ConformalBlockTableSeed(dim, l_max, min(m_max + 2 * n_max, 3), 0, k_max, delta_12, delta_34, odd_spins)
+	small_table = ConformalBlockTableSeed(dim, k_max, l_max, min(m_max + 2 * n_max, 3), 0, delta_12, delta_34, odd_spins)
 	self.m_order = small_table.m_order
 	self.n_order = small_table.n_order
 	self.table = small_table.table
