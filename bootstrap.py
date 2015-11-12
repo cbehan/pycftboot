@@ -197,9 +197,10 @@ class ConformalBlockVector:
 	        for n in range(0, old_list.chunks[j].nrows()):
 		    element = res_list[k].chunks[j].get(n, 0)
 		    
-		    if len(element.free_symbols) == 0 and pole in dual_poles:
-		        element = element * (delta - pole)
-		    elif len(element.free_symbols) > 0:
+		    if len(element.free_symbols) == 0:
+		        if pole in dual_poles:
+			    element = element * (delta - pole)
+		    else:
 		        aux = list(element.free_symbols)[0]
 			series = 3
 			
@@ -211,11 +212,14 @@ class ConformalBlockVector:
 			    series = 2
 			
 			sign = sympy.Rational(pol_list[k][3] - series, pol_list[k][3] - 2)
-			element = element.expand()
-			element = element * aux / sign
-			element = element.expand()
-			element = element.subs(aux, sign * (delta - pole))
-		        #element = element.subs(aux, sign)
+			if pole in dual_poles:
+			    sign = sympy.Rational(pol_list[k][3] - series, pol_list[k][3] - 2)
+			    element = element.expand()
+			    element = element * aux / sign
+			    element = element.expand()
+			    element = element.subs(aux, sign * (delta - pole))
+			else:
+			    element = element.subs(aux, sign)
 		    
 		    old_list.chunks[j].set(n, 0, element)
 	    
