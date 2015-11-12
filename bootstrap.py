@@ -14,11 +14,6 @@ import sympy
 prec = 660
 mpmath.mp.dps = int((3.0 / 10.0) * prec)
 
-s_matrix = []
-r_powers = []
-dual_poles = []
-leading_blocks = []
-
 rho_cross = 3 - 2 * mpmath.sqrt(2)
 r_cross = eval_mpfr(3 - 2 * sqrt(2), prec)
 
@@ -162,151 +157,10 @@ class LeadingBlockVector:
 		chunk.append(expression.subs({r : r_cross, eta : 1}))
 	    self.chunks.append(DenseMatrix(len(chunk), 1, chunk))
 
-class OldBlockVector:
-    def __init__(self, dim, Delta, l, delta_12, delta_34, derivative_order, kept_pole_order, top, old_pair, old_series):
-        global r_powers
-	global dual_poles
-        self.chunks = []
-	summation = []
-	nu = sympy.Rational(dim, 2) - 1
-        k = 1
-	
-        # Reuse leading block vectors that have already been calculated
-	if len(leading_blocks) == 0:
-	    lb = LeadingBlockVector(dim, l, delta_12, delta_34, derivative_order)
-	    leading_blocks.append(lb)
-	else:
-            for lb in leading_blocks:
-                if lb.spin == l and lb.derivative_order == derivative_order:
-	            break
-            if lb.spin != l:
-                lb = LeadingBlockVector(dim, l, delta_12, delta_34, derivative_order)
-	        leading_blocks.append(lb)
-        for i in range(0, derivative_order + 1):
-	    summation.append(lb.chunks[i])
-	
-	# Take the same strategy with powers of the R matrix
-	if top == True:
-	    r_powers = []
-	    identity = [0] * ((derivative_order + 1) ** 2)
-	    lower_band = [0] * ((derivative_order + 1) ** 2)
-	
-	    for i in range(0, derivative_order + 1):
-	        identity[i * (derivative_order + 1) + i] = 1
-	    for i in range(1, derivative_order + 1):
-	        lower_band[i * (derivative_order + 1) + i - 1] = i
-		
-	    identity = DenseMatrix(derivative_order + 1, derivative_order + 1, identity)
-	    lower_band = DenseMatrix(derivative_order + 1, derivative_order + 1, lower_band)
-	    r_matrix = identity.mul_scalar(r_cross).add_matrix(lower_band)
-	    r_powers.append(identity)
-	    r_powers.append(r_matrix)
-	
-	# Top says we have not recursed yet and our expression is still expected to have denominators
-        # with the free variable delta. Cancelling them later is slow so we do it now.
-        if top == True:
-            poles = get_poles(dim, l, delta_12, delta_34, kept_pole_order)
-	    for p in poles:
-	        for i in range(0, derivative_order + 1):
-	            summation[i] = summation[i].mul_scalar(delta - p)
-	elif old_pair[0] == delta and old_pair[1] in dual_poles:
-	    for i in range(0, derivative_order + 1):
-	        summation[i] = summation[i].mul_scalar(old_pair[0] - old_pair[1])
-	
-	if dim % 2 != 0:
-	    dual_poles = []
-	
-	# Preparing for infinite residues that may be encountered soon
-        if top == True and dim % 2 == 0:
-	    dual_poles = []
-	    while (2 * k) <= kept_pole_order:
-	        if k >= nu + l and is_nonzero(delta_residue(nu, k, l, delta_12, delta_34, 2)):
-	            dual_poles.append(delta_pole(nu, k, l, 2))
-		    dual_poles.append(delta_pole(nu, k, l, 2))
-	        k += 1
-	    k = 1
-	
-        while k <= kept_pole_order:
-	    if len(r_powers) < k + 1:
-	        r_powers.append(r_powers[k - 1].mul_matrix(r_powers[1]))
-		
-            res = delta_residue(nu, k, l, delta_12, delta_34, 1)
-	    if is_nonzero(res):
-	        pole = delta_pole(nu, k, l, 1)
-		new_block = MeromorphicBlockVector(dim, pole + k, l + k, delta_12, delta_34, derivative_order, kept_pole_order - k, False, (Delta, pole), 1)
-		if old_pair[0] == delta and old_pair[1] in dual_poles and Delta != pole:
-	            res *= (old_pair[0] - old_pair[1])
-		
-		if top == True:
-		    res *= omit_all(poles, pole)
-		elif Delta != pole:
-		    res /= Delta - pole
-		else:
-		    current_series = 1
-		    sign = sympy.Rational(2 - old_series, old_series - current_series)
-		    if old_pair[0] == delta:
-		        res *= sign
-		    else:
-		        res /= (old_pair[0] - old_pair[1]) / sign
-				
-		for i in range(0, derivative_order + 1):
-		    r_sub = r_powers[k].submatrix(0, derivative_order - i, 0, derivative_order - i)
-		    summation[i] = summation[i].add_matrix(r_sub.mul_matrix(new_block.chunks[i]).mul_scalar(res))
-	    
-	    # We don't REALLY skip these parts for (k / 2) >= nu + l
-	    # It's just that whenever this happens, the same pole has shown up in one of the other two sections
-	    # The fact that it did will be signalled by a divergence that the program runs into
-	    # It will handle this divergence in a way equivalent to keeping this term and taking the limit
-	    if (k % 2 == 0) and ((k / 2) < nu + l or dim % 2 != 0):
-	        res = delta_residue(nu, k / 2, l, delta_12, delta_34, 2)
-	        if is_nonzero(res):
-	            pole = delta_pole(nu, k / 2, l, 2)
-		    new_block = MeromorphicBlockVector(dim, pole + k, l, delta_12, delta_34, derivative_order, kept_pole_order - k, False, (Delta, pole), 2)
-		    if old_pair[0] == delta and old_pair[1] in dual_poles and Delta != pole:
-	                res *= (old_pair[0] - old_pair[1])
-		    
-		    if top == True:
-		        res *= omit_all(poles, pole)
-		    else:
-		        res /= Delta - pole
-		    
-		    for i in range(0, derivative_order + 1):
-		        r_sub = r_powers[k].submatrix(0, derivative_order - i, 0, derivative_order - i)
-		        summation[i] = summation[i].add_matrix(r_sub.mul_matrix(new_block.chunks[i]).mul_scalar(res))
-	    
-	    if k <= l:
-	        res = delta_residue(nu, k, l, delta_12, delta_34, 3)
-	        if is_nonzero(res):
-		    pole = delta_pole(nu, k, l, 3)
-		    new_block = MeromorphicBlockVector(dim, pole + k, l - k, delta_12, delta_34, derivative_order, kept_pole_order - k, False, (Delta, pole), 3)
-		    if old_pair[0] == delta and old_pair[1] in dual_poles and Delta != pole:
-	                res *= (old_pair[0] - old_pair[1])
-		    
-		    if top == True:
-		        res *= omit_all(poles, pole)
-		    elif Delta != pole:
-		        res /= Delta - pole
-		    else:
-		        current_series = 3
-			sign = sympy.Rational(old_series - 2, old_series - current_series)
-			if old_pair[0] == delta:
-		            res *= sign
-		        else:
-		            res /= (old_pair[0] - old_pair[1]) / sign
-		    
-		    for i in range(0, derivative_order + 1):
-		        r_sub = r_powers[k].submatrix(0, derivative_order - i, 0, derivative_order - i)
-		        summation[i] = summation[i].add_matrix(r_sub.mul_matrix(new_block.chunks[i]).mul_scalar(res))
-	    
-	    k += 1
-	
-	# A chunk is a set of r derivatives for one eta derivative
-	# The matrix that should multiply a chunk is just R restricted to the right length
-	for i in range(0, derivative_order + 1):
-	    self.chunks.append(summation[i])
-
 class MeromorphicBlockVector:
     def __init__(self, leading_block):
+        # A chunk is a set of r derivatives for one eta derivative
+	# The matrix that should multiply a chunk is just R restricted to the right length
 	self.chunks = []
 	
 	for j in range(0, len(leading_block.chunks)):
@@ -442,7 +296,11 @@ class ConformalBlockTableSeed:
                     if is_nonzero(res):
                         current_pol_list.append((k, k, l + k, 1))
     
-                if (k % 2 == 0) and ((k / 2) < nu + l or dim % 2 != 0):
+                # We don't REALLY skip these parts for (k / 2) >= nu + l
+		# It's just that whenever this happens, the same pole has shown up in one of the other two sections
+		# The fact that it did will be signalled by a divergence that the program runs into
+		# It will handle this divergence in a way equivalent to keeping this term and taking the limit
+		if (k % 2 == 0) and ((k / 2) < nu + l or dim % 2 != 0):
                     res = delta_residue(nu, k / 2, l, delta_12, delta_34, 2)
 	            if is_nonzero(res):
 	                current_pol_list.append((k, k / 2, l, 2))
