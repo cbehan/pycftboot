@@ -942,7 +942,7 @@ class SDP:
 		    new_vector = []
 		    for i in range(0, len(self.table[l].vector)):
 	                new_vector.append(self.table[l].vector[i].subs(delta, p[1]))
-		    inner_list.append(PolynomialVector(new_vector, p[0])
+		    inner_list.append(PolynomialVector(new_vector, p[0]))
 		outer_list.append(inner_list)
 	    extra_vectors.append(outer_list)
 	self.table += extra_vectors
@@ -1191,21 +1191,26 @@ class SDP:
 	    if self.table[l].label == spin_irrep:
 	        break
 	
-	if len(self.table[l]) > 1:
-	    print "Only supported for 1x1 matrices"
-	    return 0.0
+	entries = []
+	size = len(self.table[l])
+	for r in range(0, size):
+	    for s in range(0, size):
+	        inner_product = 0.0
+	        polynomial_vector = self.reshuffle_with_normalization(self.table[l][r][s].vector, self.unit)
 	
-	inner_product = 0.0
-	polynomial_vector = self.reshuffle_with_normalization(self.table[l][temp][temp].vector, self.unit)
+	        for i in range(0, len(self.table[l][r][s].vector)):
+	            inner_product += functional[i] * polynomial_vector[i]
+	            inner_product = inner_product.expand()
+		
+		entries.append(inner_product)
 	
-	for i in range(0, len(self.table[l][0][0].vector)):
-	    inner_product += functional[i] * polynomial_vector[i]
-	    inner_product = inner_product.expand()
+	matrix = DenseMatrix(size, size, entries)
+	determinant = matrix.det().expand()
 	
-	if type(inner_product) == type(eval_mpfr(1, 10)):
-	    coeff_list = [inner_product]
+	if type(determinant) == type(eval_mpfr(1, 10)):
+	    coeff_list = [determinant]
 	else:
-	    coeff_list = sorted(inner_product.args, key = self.extract_power)
+	    coeff_list = sorted(determinant.args, key = self.extract_power)
 	if coeff_list == []:
 	    coeff_list = [0.0]
 	
