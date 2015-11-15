@@ -54,13 +54,8 @@ def delta_residue(nu, k, l, delta_12, delta_34, series):
 	else:
 	    return ret * (sympy.rf(l + 2 * nu, k) / sympy.rf(l + nu, k))
     elif series == 2:
-        # There should be expressions for all integer dimension differences that
-	# make it clear when their Pochhammer symbols cancel divergences in ret.
-        if delta_12 == 0 and delta_34 == 0:
-	    return - sympy.rf(nu, k) * sympy.rf(1 - nu, k) * (sympy.rf((nu + l + 1 - k) / 2, k) ** 2 / sympy.rf((nu + l - k) / 2, k) ** 2) * (k / factorial(k) ** 2) * ((nu + l - k) / (nu + l + k))
-	else:
-            ret = - ((k * (-16) ** k) / (factorial(k) ** 2)) * (sympy.rf(nu - k, 2 * k) / (sympy.rf(l + nu - k, 2 * k) * sympy.rf(l + nu + 1 - k, 2 * k)))
-	    return ret * sympy.rf((1 - k + l + nu + delta_12) / two, k) * sympy.rf((1 - k + l + nu + delta_34) / two, k) * sympy.rf((1 - k + l + nu - delta_12) / two, k) * sympy.rf((1 - k + l + nu - delta_34) / two, k)
+        ret = - ((k * sympy.rf(nu, k) * sympy.rf(1 - nu, k)) / (factorial(k) ** 2)) * ((l + nu - k) / (l + nu + k))
+	return ret * sympy.rf((1 - k + l + nu + delta_12) / 2, k) * sympy.rf((1 - k + l + nu + delta_34) / 2, k) * sympy.rf((1 - k + l + nu - delta_12) / 2, k) * sympy.rf((1 - k + l + nu - delta_34) / 2, k) / ((sympy.rf((l + nu - k + 1) / 2, k) * sympy.rf((l + nu - k) / 2, k)) ** 2)
     else:
 	return - ((k * (-4) ** k) / (factorial(k) ** 2)) * (sympy.rf(1 + l - k, k) * sympy.rf((1 - k + delta_12) / two, k) * sympy.rf((1 - k + delta_34) / two, k) / sympy.rf(1 + nu + l - k, k))
 
