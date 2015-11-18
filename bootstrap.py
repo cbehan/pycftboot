@@ -97,7 +97,7 @@ def leading_block(nu, r, eta, l, delta_12, delta_34):
     
     # Time saving special case
     if delta_12 == delta_34:
-        return ret / (((1 - r ** 2) ** nu) * sqrt((1 + r ** 2) ** 2 - 4 * (r * eta) ** 2))
+        return ((-1) ** l) * ret / (((1 - r ** 2) ** nu) * sqrt((1 + r ** 2) ** 2 - 4 * (r * eta) ** 2))
     else:
         return ((-1) ** l) * ret / (((1 - r ** 2) ** nu) * ((1 + r ** 2 + 2 * r * eta) ** ((1.0 + delta_12 - delta_34) / 2.0)) * ((1 + r ** 2 - 2 * r * eta) ** ((1.0 - delta_12 + delta_34) / 2.0)))
 
@@ -226,6 +226,9 @@ class ConformalBlockVector:
 	for j in range(0, derivative_order + 1):
 	    s_sub = s_matrix.submatrix(0, derivative_order - j, 0, derivative_order - j)
 	    self.chunks[j] = s_sub.mul_matrix(self.chunks[j])
+	    # Any blocks that were conveniently made negative should be made positive again
+	    if l % 2 == 1:
+	        self.chunks[j] = self.chunks[j].mul_scalar(-1)
 
 class PolynomialVector:
     def __init__(self, derivatives, spin_irrep):
