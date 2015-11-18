@@ -938,8 +938,8 @@ class SDP:
 	        inner_list = []
 	        for s in range(0, size):
 		    new_vector = []
-		    for i in range(0, len(self.table[l].vector)):
-	                new_vector.append(self.table[l].vector[i].subs(delta, p[1]))
+		    for i in range(0, len(self.table[l][r][s].vector)):
+	                new_vector.append(self.table[l][r][s].vector[i].subs(delta, p[1]))
 		    inner_list.append(PolynomialVector(new_vector, p[0]))
 		outer_list.append(inner_list)
 	    extra_vectors.append(outer_list)
