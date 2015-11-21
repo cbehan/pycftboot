@@ -26,9 +26,9 @@ auxs = [aux1, aux2, aux3]
 
 def is_nonzero(num):
     if type(num) == type(1.0):
-        return abs(num) < 1e-10
+        return abs(num) > 1e-10
     elif type(num) == type(eval_mpfr(1, 10)):
-        return num > 1e-10 or num < -1e-10
+        return abs(float(num)) > 1e-10
     else:
         return num != 0
 
@@ -599,9 +599,9 @@ class ConformalBlockTable:
 		coeff2 = m * (m - 1) * (2 - 4 * n - 4 * nu)
 		coeff3 = m * (m - 1) * (m - 2) * (2 - 4 * n - 4 * nu)
 		coeff4 = 1
-		coeff5 = (-6 + m + 4 * n - 2 * nu - 2 * delta_sum)
-		coeff6 = (-1) * (4 * c_2 + m * m + 8 * m * n - 5 * m + 4 * n * n - 2 * n - 2 - 4 * nu * (1 - m - n) + delta_sum * (m + 2 * n - 2) + 2 * delta_prod)
-		coeff7 = m * (-1) * (m * m + 12 * m * n - 13 * m + 12 * n * n - 34 * n + 22 - 2 * nu * (2 * n - m - 1) + 2 * delta_sum * (m + 4 * n - 5) + 4 * delta_prod)
+		coeff5 = (-6 + m + 4 * n - 2 * nu - 4 * delta_sum)
+		coeff6 = (-1) * (4 * c_2 + m * m + 8 * m * n - 5 * m + 4 * n * n - 2 * n - 2 - 4 * nu * (1 - m - n) + 4 * delta_sum * (m + 2 * n - 2) + 2 * delta_prod)
+		coeff7 = m * (-1) * (m * m + 12 * m * n - 13 * m + 12 * n * n - 34 * n + 22 - 2 * nu * (2 * n - m - 1) + 2 * delta_sum * (m + 4 * n - 5) + 2 * delta_prod)
 		coeff8 = (1 - n)
 		coeff9 = (1 - n) * (-6 + 3 * m + 4 * n - 2 * nu + 2 * delta_sum)
 		
