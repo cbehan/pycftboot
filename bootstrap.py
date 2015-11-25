@@ -19,160 +19,7 @@ r_cross = eval_mpfr(3 - 2 * sqrt(2), prec)
 
 delta  = symbols('delta')
 delta_ext = symbols('delta_ext')
-aux_upper = symbols('aux_upper')
-aux_lower = symbols('aux_lower')
-
-def free_symbols(obj):
-    if "free_symbols" in dir(obj):
-        return obj.free_symbols
-    else:
-        return []
-
-def is_nonzero(num):
-    if type(num) == type(1.0):
-        return abs(num) > 1e-10
-    elif type(num) == type(eval_mpfr(1, 10)):
-        return abs(float(num)) > 1e-10
-    else:
-        return num != 0
-
-def delta_pole(nu, k, l, series):
-    if series == 1:
-        return 1 - l - k
-    elif series == 2:
-	return 1 + nu - k
-    else:
-	return 1 + l + 2 * nu - k
-
-def delta_residue(nu, k, l, delta_12, delta_34, series):
-    # Time saving special case
-    two = eval_mpfr(2, prec)
-    check_numerator = False
-    if series != 2 and k % 2 != 0 and delta_12 == 0 and delta_34 == 0:
-        return 0
-    
-    if series == 1:
-        ret = - ((k * (-4) ** k) / (factorial(k) ** 2)) * sympy.rf((1 - k + delta_12) / two, k) * sympy.rf((1 - k + delta_34) / two, k)
-	if l == 0 and nu == 0:
-	    # Take l to 0, then nu
-	    return ret * 2
-	else:
-	    return ret * (sympy.rf(l + 2 * nu, k) / sympy.rf(l + nu, k))
-    elif series == 2:
-        ret = ((k * sympy.rf(nu + 1, k - 1)) / (factorial(k) ** 2)) * ((l + nu - k) / (l + nu + k))
-	if k >= l + nu and (l + nu - k) % 2 == 0:
-	    check_numerator = True
-	    ret *= sympy.rf(-nu, nu) * factorial(k - nu) / ((sympy.rf((l + nu - k + 1) / 2, k) * sympy.rf((l + nu - k) / 2, (k - l - nu) / 2) * factorial(((l + nu - k) / 2) + (k - 1))) ** 2)
-	elif k >= l + nu + 1 and (l + nu + 1 - k) % 2 == 0:
-	    check_numerator = True
-	    ret *= sympy.rf(-nu, nu) * factorial(k - nu) / ((sympy.rf((l + nu - k) / 2, k) * sympy.rf((l + nu - k + 1) / 2, (k - 1 - l - nu) / 2) * factorial(((l + nu - k + 1) / 2) + (k - 1))) ** 2)
-	
-	if check_numerator == False:
-	    ret *= sympy.rf(-nu, k + 1) / ((sympy.rf((l + nu - k + 1) / 2, k) * sympy.rf((l + nu - k) / 2, k)) ** 2)
-	    return ret * sympy.rf((1 - k + l + nu + delta_12) / 2, k) * sympy.rf((1 - k + l + nu + delta_34) / 2, k) * sympy.rf((1 - k + l + nu - delta_12) / 2, k) * sympy.rf((1 - k + l + nu - delta_34) / 2, k)
-	else:
-	    factor = 0
-	    factors = [l + nu + 1 - delta_12, l + nu + 1 + delta_12, l + nu + 1 - delta_34, l + nu + 1 + delta_34]
-	    numerator_help = 0
-	    
-            for f in factors:
-                if -k < f <= k and (f - k) % 2 == 0:
-		    numerator_help += 1
-		    factor = f
-	    
-	    if numerator_help > 1:
-	        return 0
-	    elif numerator_help == 0:
-	        return sympy.rf(-nu, k + 1) / ((sympy.rf((l + nu - k + 1) / 2, k) * sympy.rf((l + nu - k) / 2, k)) ** 2)
-	    else:
-	        ret *= sympy.rf(factor / 2, -factor / 2) * factorial((factor / 2) + k - 1)
-		for f in factors:
-		    if f != factors:
-		        ret *= sympy.rf(factor / 2, k)
-		return ret
-    else:
-	return - ((k * (-4) ** k) / (factorial(k) ** 2)) * (sympy.rf(1 + l - k, k) * sympy.rf((1 - k + delta_12) / two, k) * sympy.rf((1 - k + delta_34) / two, k) / sympy.rf(1 + nu + l - k, k))
-
-# For special vanishing residues, we keep track of the zero factor and the nonzero factor
-# The symbol aux_upper is set to 0 at the end but might end up cancelling earlier
-def sanitized_residue(dim, k, l, delta_12, delta_34, series):
-    nu = sympy.Rational(dim, 2) - 1    
-    res = delta_residue(nu, k, l, delta_12, delta_34, series)
-        
-    if dim % 2 != 0 or series != 2 or is_nonzero(res):
-        return res
-    elif (k >= l + nu and (l + nu - k) % 2 == 0) or (k >= l + nu + 1 and (l + nu + 1 - k) % 2 == 0):
-        return res
-    
-    factors = [l + nu + 1 - delta_12, l + nu + 1 + delta_12, l + nu + 1 - delta_34, l + nu + 1 + delta_34]
-    for f in factors:
-        if -k < f <= k and (f - k) % 2 == 0:
-            return res
-    
-    # If we get to here, this residue is zero and in a way that could potentially cancel a divergence
-    ret = - ((k * sympy.rf(nu + 1, k - 1) * sympy.rf(- nu, nu) * factorial(k - nu) * aux_upper) / (factorial(k) ** 2)) * ((l + nu - k) / (l + nu + k))
-    return ret * sympy.rf((1 - k + l + nu + delta_12) / 2, k) * sympy.rf((1 - k + l + nu + delta_34) / 2, k) * sympy.rf((1 - k + l + nu - delta_12) / 2, k) * sympy.rf((1 - k + l + nu - delta_34) / 2, k) / ((sympy.rf((l + nu - k + 1) / 2, k) * sympy.rf((l + nu - k) / 2, k)) ** 2)
-
-# For residues of the second series, we must be careful
-# In generic spacetime dimension, we only exclude residues that are zero (none will be infinite)
-# In even spacetime dimension, we only exclude residues that are infinite (zeros might be needed later)
-def include_residue(dim, k, l, delta_12, delta_34):
-    nu = sympy.Rational(dim, 2) - 1
-    numerator_help = 0
-    
-    if dim % 2 != 0:
-        return is_nonzero(delta_residue(nu, k, l, delta_12, delta_34, 2))
-    else:
-        factors = [l + nu + 1 - delta_12, l + nu + 1 + delta_12, l + nu + 1 - delta_34, l + nu + 1 + delta_34]
-        for f in factors:
-	    if -k < f <= k and (f - k) % 2 == 0:
-	        numerator_help += 1
-	if (k >= l + nu and (l + nu - k) % 2 == 0) or (k >= l + nu + 1 and (l + nu + 1 - k) % 2 == 0):
-	    return numerator_help > 0
-	else:
-	    return True
-
-# We want double poles to show up here
-def get_poles(dim, l, delta_12, delta_34, kept_pole_order):
-    nu = sympy.Rational(dim, 2) - 1
-
-    k = 1
-    ret = []
-    while k <= kept_pole_order:
-        if is_nonzero(delta_residue(nu, k, l, delta_12, delta_34, 1)):
-	    ret.append(delta_pole(nu, k, l, 1))
-	    
-	# Nonzero but it might be infinite
-	if k % 2 == 0:
-	    if is_nonzero(delta_residue(nu, k / 2, l, delta_12, delta_34, 2)):
-	        ret.append(delta_pole(nu, k / 2, l, 2))
-	    
-	if k <= l:
-	    if is_nonzero(delta_residue(nu, k, l, delta_12, delta_34, 3)):
-	        ret.append(delta_pole(nu, k, l, 3))
-
-	k += 1
-
-    return ret
-
-def omit_all(poles, special_pole):
-    expression = 1
-    for p in poles:
-        if p != special_pole:
-	    expression *= (delta - p)
-    return expression
-
-def leading_block(nu, r, eta, l, delta_12, delta_34):
-    if nu == 0:
-        ret = sympy.chebyshevt(l, eta)
-    else:
-        ret = factorial(l) * sympy.gegenbauer(l, nu, eta) / sympy.rf(2 * nu, l)
-    
-    # Time saving special case
-    if delta_12 == delta_34:
-        return ((-1) ** l) * ret / (((1 - r ** 2) ** nu) * sqrt((1 + r ** 2) ** 2 - 4 * (r * eta) ** 2))
-    else:
-        return ((-1) ** l) * ret / (((1 - r ** 2) ** nu) * ((1 + r ** 2 + 2 * r * eta) ** ((1.0 + delta_12 - delta_34) / 2.0)) * ((1 + r ** 2 - 2 * r * eta) ** ((1.0 - delta_12 + delta_34) / 2.0)))
+aux = symbols('aux')
 
 def dump_table_contents(block_table, name):
     dump_file = open(name, 'w')
@@ -198,6 +45,116 @@ def dump_table_contents(block_table, name):
 	dump_file.write("self.table.append(PolynomialVector(derivatives, [" + block_table.table[l].label[0].__str__() + ", 0]))\n")
 
     dump_file.close()
+
+def delta_pole(nu, k, l, series):
+    if nu % 1 == 0:
+        nu = int(nu)
+    
+    if series == 1:
+        pole = 1 - l - k
+    elif series == 2:
+	pole = 1 + nu - k
+	if nu % 1 == 0:
+	    pole += aux
+    else:
+	pole = 1 + l + 2 * nu - k
+	if nu % 1 == 0:
+	    pole += 2 * aux
+    
+    if nu % 1 == 0:
+        return pole
+    else:
+        return eval_mpfr(pole, prec)
+
+# Returns a residue if it is strictly between 0 and inf
+# Otherwise, the result will have the symbol aux (understood as 0) in the numerator or denominator
+def delta_residue(nu, k, l, delta_12, delta_34, series):
+    # Time saving special case
+    two = eval_mpfr(2, prec)
+    check_numerator = False
+    if series != 2 and k % 2 != 0 and delta_12 == 0 and delta_34 == 0:
+        return 0
+    
+    if series == 1:
+        ret = - ((k * (-4) ** k) / (factorial(k) ** 2)) * sympy.rf((1 - k + delta_12) / two, k) * sympy.rf((1 - k + delta_34) / two, k)
+	if l == 0 and nu == 0:
+	    # Take l to 0, then nu
+	    return ret * 2
+	else:
+	    return ret * (sympy.rf(l + 2 * nu, k) / sympy.rf(l + nu, k))
+    elif series == 2:
+        ret = ((k * sympy.rf(nu + 1, k - 1)) / (factorial(k) ** 2))
+	factors = [l + nu + 1 - delta_12, l + nu + 1 + delta_12, l + nu + 1 - delta_34, l + nu + 1 + delta_34]
+	
+	if l + nu == k:
+	    ret *= aux / (l + nu + k)
+	else:
+	    ret *= (l + nu - k) / (l + nu + k)
+
+	if k >= l + nu and (l + nu - k) % 2 == 0:
+	    ret *= -4 * sympy.rf(-nu, nu) * factorial(k - nu) / (aux * (sympy.rf((l + nu - k + 1) / 2, k) * sympy.rf((l + nu - k) / 2, (k - l - nu) / 2) * factorial(((l + nu - k) / 2) + (k - 1))) ** 2)
+	elif k >= l + nu + 1 and (l + nu + 1 - k) % 2 == 0:
+	    ret *= -4 * sympy.rf(-nu, nu) * factorial(k - nu) / (aux * (sympy.rf((l + nu - k) / 2, k) * sympy.rf((l + nu - k + 1) / 2, (k - 1 - l - nu) / 2) * factorial(((l + nu - k + 1) / 2) + (k - 1))) ** 2)
+	elif k >= nu and nu % 1 == 0:
+	    ret *= -sympy.rf(-nu, nu) * factorial(k - nu) * aux / ((sympy.rf((l + nu - k + 1) / 2, k) * sympy.rf((l + nu - k) / 2, k)) ** 2)
+	else:
+	    ret *= sympy.rf(-nu, k + 1) / ((sympy.rf((l + nu - k + 1) / 2, k) * sympy.rf((l + nu - k) / 2, k)) ** 2)
+	
+	for f in factors:
+	    if -k < f <= k and (f - k) % 2 == 0:
+	        ret *= sympy.rf((f - k) / 2, (k - f) / 2) * factorial(((f + k) / 2) - 1) * aux / 2
+	    else:
+	        ret *= sympy.rf((f - k) / 2, k)
+		
+	return ret.expand()
+    else:
+	return - ((k * (-4) ** k) / (factorial(k) ** 2)) * (sympy.rf(1 + l - k, k) * sympy.rf((1 - k + delta_12) / two, k) * sympy.rf((1 - k + delta_34) / two, k) / sympy.rf(1 + nu + l - k, k))
+
+# We want double poles to show up here
+def get_poles(dim, l, delta_12, delta_34, kept_pole_order):
+    nu = sympy.Rational(dim, 2) - 1
+
+    k = 1
+    ret = []
+    while k <= kept_pole_order:
+        if delta_residue(nu, k, l, delta_12, delta_34, 1) != 0:
+	    ret.append(delta_pole(nu, k, l, 1))
+	    
+	# Nonzero but it might be infinite
+	if k % 2 == 0:
+	    if delta_residue(nu, k / 2, l, delta_12, delta_34, 2) != 0:
+	        ret.append(delta_pole(nu, k / 2, l, 2))
+	    
+	if k <= l:
+	    if delta_residue(nu, k, l, delta_12, delta_34, 3) != 0:
+	        ret.append(delta_pole(nu, k, l, 3))
+
+	k += 1
+
+    for i in range(0, len(ret)):
+        if "subs" in dir(ret[i]):
+	    ret[i] = ret[i].subs(aux, 0)
+    
+    return ret
+
+def omit_all(poles, special_pole, var):
+    expression = 1
+    for p in poles:
+        if p != special_pole:
+	    expression *= (var - p)
+    return expression
+
+def leading_block(nu, r, eta, l, delta_12, delta_34):
+    if nu == 0:
+        ret = sympy.chebyshevt(l, eta)
+    else:
+        ret = factorial(l) * sympy.gegenbauer(l, nu, eta) / sympy.rf(2 * nu, l)
+    
+    # Time saving special case
+    if delta_12 == delta_34:
+        return ((-1) ** l) * ret / (((1 - r ** 2) ** nu) * sqrt((1 + r ** 2) ** 2 - 4 * (r * eta) ** 2))
+    else:
+        return ((-1) ** l) * ret / (((1 - r ** 2) ** nu) * ((1 + r ** 2 + 2 * r * eta) ** ((1.0 + delta_12 - delta_34) / 2.0)) * ((1 + r ** 2 - 2 * r * eta) ** ((1.0 - delta_12 + delta_34) / 2.0)))
 
 class LeadingBlockVector:
     def __init__(self, dim, l, delta_12, delta_34, derivative_order):
@@ -241,20 +198,11 @@ class MeromorphicBlockVector:
 
 class ConformalBlockVector:
     def __init__(self, dim, l, delta_12, delta_34, derivative_order, kept_pole_order, s_matrix, leading_block, pol_list, res_list):
-        poles = get_poles(dim, l, delta_12, delta_34, kept_pole_order)
-	nu = sympy.Rational(dim, 2) - 1
-	
+	poles = get_poles(dim, l, delta_12, delta_34, kept_pole_order)
 	dual_poles = []
 	self.chunks = []
-	k = 1
 	
-	if dim % 2 == 0:
-	    while (2 * k) <= kept_pole_order:
-	        # At the top level, residues that vanish should no longer be included
-	        if not include_residue(dim, k, l, delta_12, delta_34):
-	            dual_poles.append(delta_pole(nu, k, l, 2))
-	        k += 1
-	
+	nu = sympy.Rational(dim, 2) - 1
 	old_list = MeromorphicBlockVector(leading_block)
 	for j in range(0, derivative_order + 1):
 	    self.chunks.append(leading_block.chunks[j])
@@ -265,31 +213,7 @@ class ConformalBlockVector:
 	    pole = delta_pole(nu, pol_list[k][1], l, pol_list[k][3])
 	    
 	    for j in range(0, derivative_order + 1):
-	        for n in range(0, old_list.chunks[j].nrows()):
-		    element = res_list[k].chunks[j].get(n, 0)
-		    
-		    if len(free_symbols(element)) < 2:
-		        element = element.subs(aux_upper, 0)
-		        if pole in dual_poles:
-			    element = element * (delta - pole)
-		    else:
-			sign = pol_list[k][3] - 2
-			if pole in dual_poles:
-			    element = element.expand()
-			    element = element * aux_upper * aux_lower / sign
-			    element = element.expand()
-			    element = element.subs(aux_lower, sign * (delta - pole) / aux_upper)
-			    element = element.expand()
-			    element = element.subs(aux_upper, 0)
-			else:
-			    # This is just not a double pole yet
-			    element = element.subs(aux_lower, sign / aux_upper)
-			    element = element.subs(aux_upper, 0)
-		    
-		    old_list.chunks[j].set(n, 0, element)
-	    
-	    for j in range(0, derivative_order + 1):
-	        self.chunks[j] = self.chunks[j].add_matrix(old_list.chunks[j].mul_scalar(omit_all(poles, pole)))
+	        self.chunks[j] = self.chunks[j].add_matrix(res_list[k].chunks[j].mul_scalar(omit_all(poles, pole, delta)))
 	
 	for j in range(0, derivative_order + 1):
 	    s_sub = s_matrix.submatrix(0, derivative_order - j, 0, derivative_order - j)
@@ -355,8 +279,10 @@ class ConformalBlockTableSeed:
         leading_blocks = []
         pol_list = []
         res_list = []
-	new_list = []
 	pow_list = []
+	den_list = []
+	new_res_list = []
+	old_den_list = []
 
         # Find out which residues we will ever need to include
         for l in range(0, l_max + k_max + 1):
@@ -366,22 +292,15 @@ class ConformalBlockTableSeed:
 
             for k in range(1, k_max + 1):
 	        if l <= l_max:
-                    res = delta_residue(nu, k, l, delta_12, delta_34, 1)
-                    if is_nonzero(res):
+                    if delta_residue(nu, k, l, delta_12, delta_34, 1) != 0:
                         current_pol_list.append((k, k, l + k, 1))
-    
-                # We don't REALLY skip these parts when the include function rejects them
-		# It's just that whenever this happens, the same pole has shown up in one of the other two sections
-		# The fact that it did will be signalled by a divergence that the program runs into
-		# It will handle this divergence in a way equivalent to keeping this term and taking the limit
-		if k % 2 == 0 and include_residue(dim, k / 2, l, delta_12, delta_34):
-                    res = sanitized_residue(dim, k / 2, l, delta_12, delta_34, 2)
-		    if is_nonzero(res):
+		
+		if k % 2 == 0:
+                    if delta_residue(nu, k / 2, l, delta_12, delta_34, 2) != 0:
 		        current_pol_list.append((k, k / 2, l, 2))
         
                 if k <= l:
-                    res = delta_residue(nu, k, l, delta_12, delta_34, 3)
-	            if is_nonzero(res):
+                    if delta_residue(nu, k, l, delta_12, delta_34, 3) != 0:
 	                current_pol_list.append((k, k, l - k, 3))
 	    
 	        if l == 0:
@@ -390,18 +309,22 @@ class ConformalBlockTableSeed:
 	    # These are in the format (n, k, l, series)
             pol_list.append(current_pol_list)
             res_list.append([])
-	    new_list.append([])
 	    pow_list.append([])
+	    den_list.append([])
+	    new_res_list.append([])
+	    old_den_list.append([])
 		
-	old_list = MeromorphicBlockVector(leading_blocks[0])
+	old_res_list = MeromorphicBlockVector(leading_blocks[0])
 	# Initialize the residues at the appropriate leading blocks
 	for l in range(0, l_max + k_max + 1):
 	    for i in range(0, len(pol_list[l])):
 	        l_new = pol_list[l][i][2]
 	        res_list[l].append(MeromorphicBlockVector(leading_blocks[l_new]))
 		
-		new_list[l].append(0)
 		pow_list[l].append(0)
+		den_list[l].append(1)
+		new_res_list[l].append(0)
+		old_den_list[l].append(1)
 
         for k in range(1, k_max + 1):
             for l in range(0, l_max + k_max + 1):
@@ -409,19 +332,12 @@ class ConformalBlockTableSeed:
 		    if pow_list[l][i] >= k_max:
 		        continue
 		    
-	            res = sanitized_residue(dim, pol_list[l][i][1], l, delta_12, delta_34, pol_list[l][i][3])
+	            res = delta_residue(nu, pol_list[l][i][1], l, delta_12, delta_34, pol_list[l][i][3])
 		    pow_list[l][i] += pol_list[l][i][0]
 
                     for j in range(0, derivative_order + 1):
 	                r_sub = r_powers[pol_list[l][i][0]].submatrix(0, derivative_order - j, 0, derivative_order - j)
 	                res_list[l][i].chunks[j] = r_sub.mul_matrix(res_list[l][i].chunks[j]).mul_scalar(res)
-			
-			if aux_upper in free_symbols(res):
-			    for n in (range(0, res_list[l][i].chunks[j].nrows())):
-			        element = res_list[l][i].chunks[j].get(n, 0)
-			        if aux_lower in free_symbols(element):
-			            element = element.subs(aux_lower, 1).expand()
-				    res_list[l][i].chunks[j].set(n, 0, element)
 	    
             for l in range(0, l_max + k_max + 1):
                 for i in range(0, len(res_list[l])):
@@ -429,51 +345,63 @@ class ConformalBlockTableSeed:
 		        continue
 		    
 		    l_new = pol_list[l][i][2]
-	            new_list[l][i] = MeromorphicBlockVector(leading_blocks[l_new])
+	            new_res_list[l][i] = MeromorphicBlockVector(leading_blocks[l_new])
+		    
+		    prod = 1
+		    current_pol_list = []
+		    pole1 = delta_pole(nu, pol_list[l][i][1], l, pol_list[l][i][3]) + pol_list[l][i][0]
 		    
 		    for i_new in range(0, len(res_list[l_new])):
-		        pole1 = delta_pole(nu, pol_list[l][i][1], l, pol_list[l][i][3]) + pol_list[l][i][0]
-			pole2 = delta_pole(nu, pol_list[l_new][i_new][1], l_new, pol_list[l_new][i_new][3])
+		        pole2 = delta_pole(nu, pol_list[l_new][i_new][1], l_new, pol_list[l_new][i_new][3])
+		        current_pol_list.append(pole2)
+			prod *= (pole1 - pole2) * old_den_list[l_new][i_new]
+		    
+		    den_list[l][i] = prod
+		    for j in range(0, derivative_order + 1):
+		        new_res_list[l][i].chunks[j] = new_res_list[l][i].chunks[j].mul_scalar(prod)
+		    
+		    for i_new in range(0, len(res_list[l_new])):
+		        pole2 = current_pol_list[i_new]
 			
-			# A divergence here means a single pole to be encountered later will become a double pole
-			# As soon as we know which double pole that is, we will substitute
-			if pole1 != pole2:
-			    denom = pole1 - pole2
-			else:
-			    denom = aux_upper * aux_lower * (pol_list[l][i][3] - pol_list[l_new][i_new][3])
+			fact = omit_all(current_pol_list, pole2, pole1)
+			for i_other in range(0, len(res_list[l_new])):
+			    if i_other != i_new:
+			        fact *= old_den_list[l_new][i_other]
 			
-			# Similarly, check if residues we are already using had this done to them
-			# If so, substitute this pole difference with an appropriate sign
 			for j in range(0, derivative_order + 1):
-			    for n in range(0, old_list.chunks[j].nrows()):
+			    for n in range(0, old_res_list.chunks[j].nrows()):
 			        element = res_list[l_new][i_new].chunks[j].get(n, 0)
-				
-				if len(free_symbols(element)) == 0:
-				    element = element / denom
-				elif len(free_symbols(element)) == 1 and len(free_symbols(denom)) == 0:
-				    element = element.subs(aux_upper, 0) / denom
-				elif len(free_symbols(element)) == 2 and len(free_symbols(denom)) == 0:
-				    element = element.subs(aux_lower, (pol_list[l_new][i_new][3] - 2) * denom / aux_upper)
-				    element = element.subs(aux_upper, 0) / denom
-				    element = element.expand()
-				elif len(free_symbols(element)) == 1:
-				    element = element.subs(aux_upper, aux_upper * aux_lower) / denom
-				    element = element.expand()
-				else:
-				    element = 0
-				
-			        old_list.chunks[j].set(n, 0, element)
-			
-                        for j in range(0, derivative_order + 1):
-			    new_list[l][i].chunks[j] = new_list[l][i].chunks[j].add_matrix(old_list.chunks[j])
+				element = element * fact
+				element = element.expand()
+			        old_res_list.chunks[j].set(n, 0, element)
+			    new_res_list[l][i].chunks[j] = new_res_list[l][i].chunks[j].add_matrix(old_res_list.chunks[j])
 	    
 	    for l in range(0, l_max + k_max + 1):
                 for i in range(0, len(res_list[l])):
 		    if pow_list[l][i] >= k_max:
 		        continue
 		    
+		    if "expand" in dir(den_list[l][i]):
+		        den_list[l][i] = den_list[l][i].expand()
+		    old_den_list[l][i] = den_list[l][i]
+
 		    for j in range(0, derivative_order + 1):
-		         res_list[l][i].chunks[j] = new_list[l][i].chunks[j]
+		         res_list[l][i].chunks[j] = new_res_list[l][i].chunks[j]
+	
+	# Divide by the common denominator again
+	for l in range(0, l_max + k_max + 1):
+	    for i in range(0, len(res_list[l])):
+	        if "expand" in dir(den_list[l][i]):
+	            den_list[l][i] = den_list[l][i].expand()
+		
+		for j in range(0, derivative_order + 1):
+		    for n in range(0, res_list[l][i].chunks[j].nrows()):
+		        element = res_list[l][i].chunks[j].get(n, 0)
+			element = element.expand()
+			element = element / den_list[l][i]
+			element = element.expand()
+			element = element.subs(aux, 0)
+			res_list[l][i].chunks[j].set(n, 0, element)
 	
         # Perhaps poorly named, S keeps track of a linear combination of derivatives
         # We get this by including the essential singularity, then stripping it off again
@@ -967,6 +895,8 @@ class SDP:
 	ret = mpmath.mpf(0)
 	
 	for p in poles:
+	    p = mpmath.mpf(str(p))
+	    
 	    if (p - shift) in single_poles:
 	        single_poles.remove(p - shift)
 		double_poles.append(p - shift)
@@ -1177,7 +1107,7 @@ class SDP:
 	    self.write_xml(obj, self.unit)
 	    self.set_bound(spin_irrep, old)
 	    
-	    os.spawnlp(os.P_WAIT, "/usr/bin/sdpb", "sdpb", "-s", "mySDP.xml", "--findPrimalFeasible", "--findDualFeasible", "--dualErrorThreshold=1e-20", "--noFinalCheckpoint")
+	    os.spawnlp(os.P_WAIT, "/usr/bin/sdpb", "sdpb", "-s", "mySDP.xml", "--findPrimalFeasible", "--findDualFeasible", "--noFinalCheckpoint")
 	    out_file = open("mySDP.out", 'r')
 	    terminate_line = out_file.next()
 	    terminate_reason = terminate_line.partition(" = ")[-1]
