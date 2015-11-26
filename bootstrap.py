@@ -11,6 +11,7 @@ from symengine import *
 from symengine.lib.symengine_wrapper import *
 import sympy
 
+cutoff = 0
 prec = 660
 mpmath.mp.dps = int((3.0 / 10.0) * prec)
 
@@ -46,6 +47,12 @@ def dump_table_contents(block_table, name):
 
     dump_file.close()
 
+def unitarity_bound(dim, spin):
+    if spin == 0:
+        return sympy.Rational(dim, 2) - 1
+    else:
+        return dim + spin - 2
+
 def delta_pole(nu, k, l, series):
     if nu % 1 == 0:
         nu = int(nu)
@@ -74,6 +81,8 @@ def delta_residue(nu, k, l, delta_12, delta_34, series):
     check_numerator = False
     if series != 2 and k % 2 != 0 and delta_12 == 0 and delta_34 == 0:
         return 0
+    elif nu % 1 == 0:
+        nu = int(nu)
     
     if series == 1:
         ret = - ((k * (-4) ** k) / (factorial(k) ** 2)) * sympy.rf((1 - k + delta_12) / two, k) * sympy.rf((1 - k + delta_34) / two, k)
@@ -199,21 +208,53 @@ class MeromorphicBlockVector:
 class ConformalBlockVector:
     def __init__(self, dim, l, delta_12, delta_34, derivative_order, kept_pole_order, s_matrix, leading_block, pol_list, res_list):
 	poles = get_poles(dim, l, delta_12, delta_34, kept_pole_order)
-	dual_poles = []
+	large_poles = []
+	small_poles = []
 	self.chunks = []
 	
 	nu = sympy.Rational(dim, 2) - 1
 	old_list = MeromorphicBlockVector(leading_block)
+	for k in range(0, len(pol_list)):
+	    pole = delta_pole(nu, pol_list[k][1], l, pol_list[k][3])
+	    
+	    if abs(float(res_list[k].chunks[0].get(0, 0))) < cutoff:
+	        small_poles.append(pole)
+	    else:
+	        large_poles.append(pole)
+	
+	matrix = []
+	if small_poles != []:
+	    for i in range(0, len(large_poles) / 2):
+	        for j in range(0, len(large_poles)):
+		    matrix.append(1 / ((unitarity_bound(dim, l) - large_poles[j]) ** (i + 1)))
+	    for i in range(0, len(large_poles) - (len(large_poles) / 2)):
+	        for j in range(0, len(large_poles)):
+		    matrix.append(1 / (((1 / cutoff) - large_poles[j]) ** (i + 1)))
+	    matrix = DenseMatrix(len(large_poles), len(large_poles), matrix)
+	    matrix = matrix.inv()
+	
 	for j in range(0, derivative_order + 1):
 	    self.chunks.append(leading_block.chunks[j])
-	    for p in poles:
+	    for p in large_poles:
 	        self.chunks[j] = self.chunks[j].mul_scalar(delta - p)
 	
 	for k in range(0, len(pol_list)):
 	    pole = delta_pole(nu, pol_list[k][1], l, pol_list[k][3])
 	    
-	    for j in range(0, derivative_order + 1):
-	        self.chunks[j] = self.chunks[j].add_matrix(res_list[k].chunks[j].mul_scalar(omit_all(poles, pole, delta)))
+	    if pole in large_poles:
+	        for j in range(0, derivative_order + 1):
+	            self.chunks[j] = self.chunks[j].add_matrix(res_list[k].chunks[j].mul_scalar(omit_all(large_poles, pole, delta)))
+	    else:
+	        vector = []
+		for i in range(0, len(large_poles) / 2):
+		    vector.append(1 / ((unitarity_bound(dim, l) - pole) ** (i + 1)))
+		for i in range(0, len(large_poles) - (len(large_poles) / 2)):
+		    vector.append(1 / (((1 / cutoff) - pole) ** (i + 1)))
+		vector = DenseMatrix(len(large_poles), 1, vector)
+		vector = matrix.mul_matrix(vector)
+		for i in range(0, len(large_poles)):
+		    for j in range(0, derivative_order + 1):
+		        self.chunks[j] = self.chunks[j].add_matrix(res_list[k].chunks[j].mul_scalar(vector.get(i, 0) * omit_all(large_poles, large_poles[i], delta)))
 	
 	for j in range(0, derivative_order + 1):
 	    s_sub = s_matrix.submatrix(0, derivative_order - j, 0, derivative_order - j)
@@ -824,10 +865,7 @@ class SDP:
         if gapped_spin_irrep == -1:
 	    for l in range(0, len(self.table)):
 	        spin = self.table[l][0][0].label[0]
-		if spin == 0:
-		    self.bounds[l] = sympy.Rational(self.dim, 2) - 1
-		else:
-		    self.bounds[l] = self.dim + spin - 2
+		self.bounds[l] = unitarity_bound(self.dim, spin)
 	else:
 	    if type(gapped_spin_irrep) == type(1):
 	        gapped_spin_irrep = [gapped_spin_irrep, 0]
@@ -837,10 +875,8 @@ class SDP:
 		    break
 	    spin = gapped_spin_irrep[0]
 	    
-	    if delta_min == -1 and spin == 0:
-	        self.bounds[l] = sympy.Rational(self.dim, 2) - 1
-	    elif delta_min == -1:
-	        self.bounds[l] = self.dim + spin - 2
+	    if delta_min == -1:
+	        self.bounds[l] = unitarity_bound(self.dim, spin)
 	    else:
 	        self.bounds[l] = delta_min
     
