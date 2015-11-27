@@ -43,7 +43,7 @@ def dump_table_contents(block_table, name):
             poly_string = block_table.table[l].vector[i].__str__()
 	    poly_string = re.sub("([0-9]+\.[0-9]+e?-?[0-9]+)", r"eval_mpfr(\1, prec)", poly_string)
             dump_file.write("derivatives.append(" + poly_string + ")\n")
-	dump_file.write("self.table.append(PolynomialVector(derivatives, [" + block_table.table[l].label[0].__str__() + ", 0]))\n")
+	dump_file.write("self.table.append(PolynomialVector(derivatives, " + block_table.table[l].label + ", " + block_table.table[l].poles + "))\n")
 
     dump_file.close()
 
@@ -119,33 +119,6 @@ def delta_residue(nu, k, l, delta_12, delta_34, series):
     else:
 	return - ((k * (-4) ** k) / (factorial(k) ** 2)) * (sympy.rf(1 + l - k, k) * sympy.rf((1 - k + delta_12) / two, k) * sympy.rf((1 - k + delta_34) / two, k) / sympy.rf(1 + nu + l - k, k))
 
-# We want double poles to show up here
-def get_poles(dim, l, delta_12, delta_34, kept_pole_order):
-    nu = sympy.Rational(dim, 2) - 1
-
-    k = 1
-    ret = []
-    while k <= kept_pole_order:
-        if delta_residue(nu, k, l, delta_12, delta_34, 1) != 0:
-	    ret.append(delta_pole(nu, k, l, 1))
-	    
-	# Nonzero but it might be infinite
-	if k % 2 == 0:
-	    if delta_residue(nu, k / 2, l, delta_12, delta_34, 2) != 0:
-	        ret.append(delta_pole(nu, k / 2, l, 2))
-	    
-	if k <= l:
-	    if delta_residue(nu, k, l, delta_12, delta_34, 3) != 0:
-	        ret.append(delta_pole(nu, k, l, 3))
-
-	k += 1
-
-    for i in range(0, len(ret)):
-        if "subs" in dir(ret[i]):
-	    ret[i] = ret[i].subs(aux, 0)
-    
-    return ret
-
 def omit_all(poles, special_pole, var):
     expression = 1
     for p in poles:
@@ -207,54 +180,57 @@ class MeromorphicBlockVector:
 
 class ConformalBlockVector:
     def __init__(self, dim, l, delta_12, delta_34, derivative_order, kept_pole_order, s_matrix, leading_block, pol_list, res_list):
-	poles = get_poles(dim, l, delta_12, delta_34, kept_pole_order)
-	large_poles = []
-	small_poles = []
+	self.large_poles = []
+	self.small_poles = []
 	self.chunks = []
 	
 	nu = sympy.Rational(dim, 2) - 1
 	old_list = MeromorphicBlockVector(leading_block)
 	for k in range(0, len(pol_list)):
 	    pole = delta_pole(nu, pol_list[k][1], l, pol_list[k][3])
+	    if "subs" in dir(pole):
+	        pole = pole.subs(aux, 0)
 	    
 	    if abs(float(res_list[k].chunks[0].get(0, 0))) < cutoff:
-	        small_poles.append(pole)
+	        self.small_poles.append(pole)
 	    else:
-	        large_poles.append(pole)
+	        self.large_poles.append(pole)
 	
 	matrix = []
-	if small_poles != []:
-	    for i in range(0, len(large_poles) / 2):
-	        for j in range(0, len(large_poles)):
-		    matrix.append(1 / ((unitarity_bound(dim, l) - large_poles[j]) ** (i + 1)))
-	    for i in range(0, len(large_poles) - (len(large_poles) / 2)):
-	        for j in range(0, len(large_poles)):
-		    matrix.append(1 / (((1 / cutoff) - large_poles[j]) ** (i + 1)))
-	    matrix = DenseMatrix(len(large_poles), len(large_poles), matrix)
+	if self.small_poles != []:
+	    for i in range(0, len(self.large_poles) / 2):
+	        for j in range(0, len(self.large_poles)):
+		    matrix.append(1 / ((unitarity_bound(dim, l) - self.large_poles[j]) ** (i + 1)))
+	    for i in range(0, len(self.large_poles) - (len(self.large_poles) / 2)):
+	        for j in range(0, len(self.large_poles)):
+		    matrix.append(1 / (((1 / cutoff) - self.large_poles[j]) ** (i + 1)))
+	    matrix = DenseMatrix(len(self.large_poles), len(self.large_poles), matrix)
 	    matrix = matrix.inv()
 	
 	for j in range(0, derivative_order + 1):
 	    self.chunks.append(leading_block.chunks[j])
-	    for p in large_poles:
+	    for p in self.large_poles:
 	        self.chunks[j] = self.chunks[j].mul_scalar(delta - p)
 	
 	for k in range(0, len(pol_list)):
 	    pole = delta_pole(nu, pol_list[k][1], l, pol_list[k][3])
+	    if "subs"in dir(pole):
+	        pole = pole.subs(aux, 0)
 	    
-	    if pole in large_poles:
+	    if pole in self.large_poles:
 	        for j in range(0, derivative_order + 1):
-	            self.chunks[j] = self.chunks[j].add_matrix(res_list[k].chunks[j].mul_scalar(omit_all(large_poles, pole, delta)))
+	            self.chunks[j] = self.chunks[j].add_matrix(res_list[k].chunks[j].mul_scalar(omit_all(self.large_poles, pole, delta)))
 	    else:
 	        vector = []
-		for i in range(0, len(large_poles) / 2):
+		for i in range(0, len(self.large_poles) / 2):
 		    vector.append(1 / ((unitarity_bound(dim, l) - pole) ** (i + 1)))
-		for i in range(0, len(large_poles) - (len(large_poles) / 2)):
+		for i in range(0, len(self.large_poles) - (len(self.large_poles) / 2)):
 		    vector.append(1 / (((1 / cutoff) - pole) ** (i + 1)))
-		vector = DenseMatrix(len(large_poles), 1, vector)
+		vector = DenseMatrix(len(self.large_poles), 1, vector)
 		vector = matrix.mul_matrix(vector)
-		for i in range(0, len(large_poles)):
+		for i in range(0, len(self.large_poles)):
 		    for j in range(0, derivative_order + 1):
-		        self.chunks[j] = self.chunks[j].add_matrix(res_list[k].chunks[j].mul_scalar(vector.get(i, 0) * omit_all(large_poles, large_poles[i], delta)))
+		        self.chunks[j] = self.chunks[j].add_matrix(res_list[k].chunks[j].mul_scalar(vector.get(i, 0) * omit_all(self.large_poles, self.large_poles[i], delta)))
 	
 	for j in range(0, derivative_order + 1):
 	    s_sub = s_matrix.submatrix(0, derivative_order - j, 0, derivative_order - j)
@@ -264,11 +240,12 @@ class ConformalBlockVector:
 	        self.chunks[j] = self.chunks[j].mul_scalar(-1)
 
 class PolynomialVector:
-    def __init__(self, derivatives, spin_irrep):
+    def __init__(self, derivatives, spin_irrep, poles):
         if type(spin_irrep) == type(1):
 	    spin_irrep = [spin_irrep, 0]
         self.vector = derivatives
 	self.label = spin_irrep
+	self.poles = poles
 
 class ConformalBlockTableSeed:
     def __init__(self, dim, k_max, l_max, m_max, n_max, delta_12 = 0, delta_34 = 0, odd_spins = False, name = None):
@@ -454,8 +431,9 @@ class ConformalBlockTableSeed:
                 new_element *= (j / ((i - j + 1) * r_cross)) * (delta - (i - j))
 	
 	for l in range(0, l_max + 1, step):
-	    conformal_blocks.append(ConformalBlockVector(dim, l, delta_12, delta_34, m_max + 2 * n_max, k_max, s_matrix, leading_blocks[l], pol_list[l], res_list[l]))
-	    self.table.append(PolynomialVector([], [l, 0]))
+	    conformal_block = ConformalBlockVector(dim, l, delta_12, delta_34, m_max + 2 * n_max, k_max, s_matrix, leading_blocks[l], pol_list[l], res_list[l])
+	    conformal_blocks.append(conformal_block)
+	    self.table.append(PolynomialVector([], [l, 0], conformal_block.large_poles))
 	
 	a = symbols('a')
 	b = symbols('b')
@@ -751,7 +729,7 @@ class ConvolvedBlockTable:
 	        for j in range(len(block_table.table[0].vector) - 1, 0, -1):
 		    deriv = deriv.subs(symbol_array[block_table.n_order[j]][block_table.m_order[j]], block_table.table[l].vector[j])
 		new_derivs.append(2 * deriv.subs(symbol_array[0][0], block_table.table[l].vector[0]))
-	    self.table.append(PolynomialVector(new_derivs, block_table.table[l].label))
+	    self.table.append(PolynomialVector(new_derivs, block_table.table[l].label, block_table.table[l].poles))
 
 class SDP:
     def __init__(self, dim_list, conv_table_list, vector_types = [[[[[[1, 0, 0, 0]]]], 0, 0]]):
@@ -843,7 +821,7 @@ class SDP:
 			    
 			    for i in range(0, len(tab.table[index].vector)):
 		                derivatives.append(quad[0] * tab.table[index].vector[i].subs(delta_ext, (dim_list[quad[2]] + dim_list[quad[3]]) / 2.0))
-			inner_list.append(PolynomialVector(derivatives, [l, vec[2]]))
+			inner_list.append(PolynomialVector(derivatives, [l, vec[2]], tab.table[index].poles))
 		    outer_list.append(inner_list)
 	        self.table.append(outer_list)
 	
@@ -992,7 +970,7 @@ class SDP:
 		    new_vector = []
 		    for i in range(0, len(self.table[l][r][s].vector)):
 	                new_vector.append(self.table[l][r][s].vector[i].subs(delta, p[1]))
-		    inner_list.append(PolynomialVector(new_vector, p[0]))
+		    inner_list.append(PolynomialVector(new_vector, p[0], self.table[l][r][s].poles))
 		outer_list.append(inner_list)
 	    extra_vectors.append(outer_list)
 	self.table += extra_vectors
@@ -1062,7 +1040,7 @@ class SDP:
 	            elements_node.appendChild(vector_node)
 	    
 	    print "Getting points"
-	    poles = get_poles(self.dim, self.table[j][0][0].label[0], 0, 0, self.k_max)
+	    poles = self.table[j][0][0].poles
 	    index = self.get_index(laguerre_degrees, degree)
 	    if j >= len(self.bounds):
 	        points = [self.points[j - len(self.bounds)][1]]
