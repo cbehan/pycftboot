@@ -43,7 +43,7 @@ def dump_table_contents(block_table, name):
             poly_string = block_table.table[l].vector[i].__str__()
 	    poly_string = re.sub("([0-9]+\.[0-9]+e?-?[0-9]+)", r"eval_mpfr(\1, prec)", poly_string)
             dump_file.write("derivatives.append(" + poly_string + ")\n")
-	dump_file.write("self.table.append(PolynomialVector(derivatives, " + block_table.table[l].label + ", " + block_table.table[l].poles + "))\n")
+	dump_file.write("self.table.append(PolynomialVector(derivatives, " + block_table.table[l].label.__str__() + ", " + block_table.table[l].poles.__str__() + "))\n")
 
     dump_file.close()
 
@@ -132,11 +132,14 @@ def leading_block(nu, r, eta, l, delta_12, delta_34):
     else:
         ret = factorial(l) * sympy.gegenbauer(l, nu, eta) / sympy.rf(2 * nu, l)
     
+    one = eval_mpfr(1, prec)
+    two = eval_mpfr(2, prec)
+    
     # Time saving special case
     if delta_12 == delta_34:
         return ((-1) ** l) * ret / (((1 - r ** 2) ** nu) * sqrt((1 + r ** 2) ** 2 - 4 * (r * eta) ** 2))
     else:
-        return ((-1) ** l) * ret / (((1 - r ** 2) ** nu) * ((1 + r ** 2 + 2 * r * eta) ** ((1.0 + delta_12 - delta_34) / 2.0)) * ((1 + r ** 2 - 2 * r * eta) ** ((1.0 - delta_12 + delta_34) / 2.0)))
+        return ((-1) ** l) * ret / (((1 - r ** 2) ** nu) * ((1 + r ** 2 + 2 * r * eta) ** ((one + delta_12 - delta_34) / two)) * ((1 + r ** 2 - 2 * r * eta) ** ((one - delta_12 + delta_34) / two)))
 
 class LeadingBlockVector:
     def __init__(self, dim, l, delta_12, delta_34, derivative_order):
@@ -235,9 +238,6 @@ class ConformalBlockVector:
 	for j in range(0, derivative_order + 1):
 	    s_sub = s_matrix.submatrix(0, derivative_order - j, 0, derivative_order - j)
 	    self.chunks[j] = s_sub.mul_matrix(self.chunks[j])
-	    # Any blocks that were conveniently made negative should be made positive again
-	    if l % 2 == 1:
-	        self.chunks[j] = self.chunks[j].mul_scalar(-1)
 
 class PolynomialVector:
     def __init__(self, derivatives, spin_irrep, poles):
@@ -632,7 +632,7 @@ class ConformalBlockTable:
 		coeff2 = m * (m - 1) * (2 - 4 * n - 4 * nu)
 		coeff3 = m * (m - 1) * (m - 2) * (2 - 4 * n - 4 * nu)
 		coeff4 = 1
-		coeff5 = (-6 + m + 4 * n - 2 * nu - 4 * delta_sum)
+		coeff5 = (-6 + m + 4 * n - 2 * nu - 2 * delta_sum)
 		coeff6 = (-1) * (4 * c_2 + m * m + 8 * m * n - 5 * m + 4 * n * n - 2 * n - 2 - 4 * nu * (1 - m - n) + 4 * delta_sum * (m + 2 * n - 2) + 2 * delta_prod)
 		coeff7 = m * (-1) * (m * m + 12 * m * n - 13 * m + 12 * n * n - 34 * n + 22 - 2 * nu * (2 * n - m - 1) + 2 * delta_sum * (m + 4 * n - 5) + 2 * delta_prod)
 		coeff8 = (1 - n)
@@ -788,12 +788,13 @@ class SDP:
 	            for s in range(0, len(matrix[r])):
 		        quad = matrix[r][s]
 	                tab = conv_table_list[quad[1]]
-			unit += quad[0] * tab.unit[i].subs(delta_ext, (dim_list[quad[2]] + dim_list[quad[3]]) / 2.0)
+			#unit += quad[0] * tab.unit[i].subs(delta_ext, (dim_list[quad[2]] + dim_list[quad[3]]) / 2.0)
+			unit += quad[0] * tab.table[0].vector[i].subs(delta, 0).subs(delta_ext, (dim_list[quad[2]] + dim_list[quad[3]]) / 2.0)
 		
 		self.m_order.append(chosen_tab.m_order[i])
 		self.n_order.append(chosen_tab.n_order[i])
 		self.unit.append(unit)
-	
+		
 	# Looping over types and spins gives "0 - S", "0 - T", "1 - A" and so on
 	for vec in vector_types:
 	    if (vec[1] % 2) == 1:
