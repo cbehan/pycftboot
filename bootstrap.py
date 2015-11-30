@@ -950,7 +950,7 @@ class SDP:
 	
 	return (rho_cross ** shift) * ret
     
-    def write_xml(self, obj, norm):
+    def write_xml(self, obj, norm, name = "mySDP"):
         obj = self.reshuffle_with_normalization(obj, norm)
         laguerre_points = []
 	laguerre_degrees = []
@@ -1101,39 +1101,46 @@ class SDP:
 	    matrices_node.appendChild(matrix_node)
 	
 	self.table = self.table[:len(self.bounds)]
-	xml_file = open("mySDP.xml", 'wb')
+	xml_file = open(name + ".xml", 'wb')
 	doc.writexml(xml_file, addindent = "    ", newl = '\n')
 	xml_file.close()
 	doc.unlink()
+    
+    def iterate(self, test, spin_irrep, name = "mySDP"):
+        if type(spin_irrep) == type(1):
+	    spin_irrep = [spin_irrep, 0]
+	
+        obj = [0.0] * len(self.table[0][0][0].vector)
+	self.set_bound(spin_irrep, test)
+	self.write_xml(obj, self.unit, name)
+	
+	os.spawnlp(os.P_WAIT, "/usr/bin/sdpb", "sdpb", "-s", name + ".xml", "--findPrimalFeasible", "--findDualFeasible", "--noFinalCheckpoint")
+	out_file = open("mySDP.out", 'r')
+	terminate_line = out_file.next()
+	terminate_reason = terminate_line.partition(" = ")[-1]
+	out_file.close()
+	
+	return terminate_reason == '"found primal feasible solution";\n'
     
     def bisect(self, lower, upper, threshold, spin_irrep):
         if type(spin_irrep) == type(1):
 	    spin_irrep = [spin_irrep, 0]
 	
-        test = (lower + upper) / 2.0
-        if abs(upper - lower) < threshold:
-	    return lower
-	else:
-	    print "Trying " + str(test)
+	old = self.get_bound(spin_irrep)
+	while abs(upper - lower) > threshold:
+	    test = (lower + upper) / 2.0
+	    print "Trying " + test.__str__()
 	    
-	    obj = [0.0] * len(self.table[0][0][0].vector)
-	    old = self.get_bound(spin_irrep)
-	    self.set_bound(spin_irrep, test)
-	    self.write_xml(obj, self.unit)
-	    self.set_bound(spin_irrep, old)
-	    
-	    os.spawnlp(os.P_WAIT, "/usr/bin/sdpb", "sdpb", "-s", "mySDP.xml", "--findPrimalFeasible", "--findDualFeasible", "--noFinalCheckpoint")
-	    out_file = open("mySDP.out", 'r')
-	    terminate_line = out_file.next()
-	    terminate_reason = terminate_line.partition(" = ")[-1]
-	    out_file.close()
-	    
-	    if terminate_reason == '"found dual feasible solution";\n':
-	        return self.bisect(lower, test, threshold, spin_irrep)
+	    result = self.iterate(test, spin_irrep)
+	    if result == False:
+	        upper = test
 	    else:
-	        return self.bisect(test, upper, threshold, spin_irrep)
+	        lower = test
+	
+	self.set_bound(spin_irrep, old)
+	return lower
     
-    def opemax(self, dimension, spin_irrep):
+    def opemax(self, dimension, spin_irrep, name = "mySDP"):
         if type(spin_irrep) == type(1):
 	    spin_irrep = [spin_irrep, 0]
 	
@@ -1150,7 +1157,7 @@ class SDP:
 	for i in range(0, len(self.table[l][0][0].vector)):
 	    norm.append(self.table[l][temp][temp].vector[i].subs(delta, dimension))
 	
-	self.write_xml(self.unit, norm)
+	self.write_xml(self.unit, norm, name)
 	os.spawnlp(os.P_WAIT, "/usr/bin/sdpb", "sdpb", "-s", "mySDP.xml", "--noFinalCheckpoint")
 	out_file = open("mySDP.out", 'r')
 	out_file.next()
@@ -1160,14 +1167,14 @@ class SDP:
 	primal_value = primal_line.partition(" = ")[-1][:-2]
 	return float(primal_value)
     
-    def solution_functional(self, dimension, spin_irrep):
+    def solution_functional(self, dimension, spin_irrep, name = "mySDP"):
         if type(spin_irrep) == type(1):
 	    spin_irrep = [spin_irrep, 0]
 	
 	obj = [0.0] * len(self.table[0][0][0].vector)
 	old = self.get_bound(spin_irrep)
 	self.set_bound(spin_irrep, dimension)
-	self.write_xml(obj, self.unit)
+	self.write_xml(obj, self.unit, name)
 	self.set_bound(spin_irrep, old)
 	
 	os.spawnlp(os.P_WAIT, "/usr/bin/sdpb", "sdpb", "-s", "mySDP.xml", "--noFinalCheckpoint")
