@@ -732,7 +732,7 @@ class ConvolvedBlockTable:
 	    self.table.append(PolynomialVector(new_derivs, block_table.table[l].label, block_table.table[l].poles))
 
 class SDP:
-    def __init__(self, dim_list, conv_table_list, vector_types = [[[[[[1, 0, 0, 0]]]], 0, 0]]):
+    def __init__(self, dim_list, conv_table_list, vector_types = [[[[[[1, 0, 0, 0]]]], 0, 0]], prototype = None):
         # If a user is looking at single correlators, we will not punish
 	# her for only passing one dimension
         if type(dim_list) != type([]):
@@ -827,7 +827,15 @@ class SDP:
 	        self.table.append(outer_list)
 	
 	self.bounds = [0.0] * len(self.table)
-	self.set_bound()
+	
+	if prototype == None:
+	    self.basis = [0] * len(self.table)
+	    self.set_bound(reset_basis = True)
+	else:
+	    self.basis = []
+	    for mat in prototype.basis:
+	        self.basis.append(mat)
+	    self.set_bound(reset_basis = False)
     
     def add_point(self, spin_irrep, dimension):
         if type(spin_irrep) == type(1):
@@ -840,11 +848,14 @@ class SDP:
 		    return self.bounds[l]
     
     # Defaults to unitarity bounds if there are missing arguments
-    def set_bound(self, gapped_spin_irrep = -1, delta_min = -1):
+    def set_bound(self, gapped_spin_irrep = -1, delta_min = -1, reset_basis = True):
         if gapped_spin_irrep == -1:
 	    for l in range(0, len(self.table)):
 	        spin = self.table[l][0][0].label[0]
 		self.bounds[l] = unitarity_bound(self.dim, spin)
+		
+		if reset_basis:
+		    self.set_basis(l)
 	else:
 	    if type(gapped_spin_irrep) == type(1):
 	        gapped_spin_irrep = [gapped_spin_irrep, 0]
@@ -858,6 +869,44 @@ class SDP:
 	        self.bounds[l] = unitarity_bound(self.dim, spin)
 	    else:
 	        self.bounds[l] = delta_min
+	    
+	    if reset_basis:
+	        self.set_basis(l)
+    
+    def set_basis(self, index):
+        poles = self.table[index][0][0].poles
+        delta_min = mpmath.mpf(self.bounds[index].__str__())	
+	bands = []
+	matrix = []
+	
+	degree = 0
+	size = len(self.table[index])
+	for r in range(0, size):
+	    for s in range(0, size):
+	        polynomial_vector = self.table[index][r][s].vector
+		
+		for n in range(0, len(polynomial_vector)):
+		    expression = polynomial_vector[n].expand()
+		    
+		    if type(expression) == type(eval_mpfr(1, 10)):
+		        coeff_list = [expression]
+		    else:
+		        coeff_list = expression.args
+		    degree = max(degree, len(coeff_list) - 1)
+	
+	for d in range(0, 2 * (degree / 2) + 1):
+	    result = self.integral(d, delta_min, poles)
+	    bands.append(result)
+	for r in range(0, (degree / 2) + 1):
+	    new_entries = []
+	    for s in range(0, (degree / 2) + 1):
+	        new_entries.append(bands[r + s])
+	    matrix.append(new_entries)
+	
+	matrix = mpmath.matrix(matrix)
+	matrix = mpmath.cholesky(matrix, tol = mpmath.mpf(1e-200))
+	matrix = mpmath.inverse(matrix)
+	self.basis[index] = matrix
     
     # Translate between the mathematica definition and the bootstrap definition of SDP
     def reshuffle_with_normalization(self, vector, norm):
@@ -1005,15 +1054,16 @@ class SDP:
 	    cols_node.appendChild(doc.createTextNode(size.__str__()))
 	    
 	    degree = 0
+	    if j >= len(self.bounds):
+	        delta_min = 0
+	    else:
+	        delta_min = self.bounds[j]
+	    
 	    for r in range(0, size):
 	        for s in range(0, size):
-	            if j >= len(self.bounds):
-	                delta_min = 0
-	            else:
-	                delta_min = self.bounds[j]
 	            polynomial_vector = self.reshuffle_with_normalization(self.table[j][r][s].vector, norm)
-	    
 	            vector_node = doc.createElement("polynomialVector")
+		    
 	            for n in range(0, len(polynomial_vector)):
 	                expression = polynomial_vector[n].expand()
 		        # Impose unitarity bounds and the specified gap
@@ -1062,27 +1112,14 @@ class SDP:
 		elt_node.appendChild(doc.createTextNode(damped_rational.__str__()))
 		sample_scaling_node.appendChild(elt_node)
 	    
-	    # We have now finished using delta_min in csympy
-	    # It's time to convert it to a more precise mpmath type for this part
-	    delta_min = mpmath.mpf(delta_min.__str__())
-	    
-	    bands = []
 	    matrix = []
-	    # One place where arbitrary precision really matters
-	    print "Getting bands"
-	    for d in range(0, 2 * (degree / 2) + 1):
-	        result = self.integral(d, delta_min, poles)
-		bands.append(result)
-	    for r in range(0, (degree / 2) + 1):
-	        new_entries = []
-	        for s in range(0, (degree / 2) + 1):
-		    new_entries.append(bands[r + s])
-		matrix.append(new_entries)
-	    matrix = mpmath.matrix(matrix)
-	    print "Decomposing matrix of size " + str(degree) + " / 2"
-	    matrix = mpmath.cholesky(matrix, tol = mpmath.mpf(1e-200))
-	    print "Inverting matrix"
-	    matrix = mpmath.inverse(matrix)
+	    if j >= len(self.bounds):
+	        delta_min = mpmath.mpf(delta_min.__str__())
+		result = self.integral(0, delta_min, poles)
+		result = 1.0 / mpmath.sqrt(result)
+		matrix = mpmath.matrix([result])
+	    else:
+	        matrix = self.basis[j]
 	    
 	    for d in range(0, (degree / 2) + 1):
 		polynomial_node = doc.createElement("polynomial")
