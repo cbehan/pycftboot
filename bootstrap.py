@@ -1152,7 +1152,7 @@ class SDP:
 	self.write_xml(obj, self.unit, name)
 	
 	os.spawnlp(os.P_WAIT, "/usr/bin/sdpb", "sdpb", "-s", name + ".xml", "--findPrimalFeasible", "--findDualFeasible", "--noFinalCheckpoint")
-	out_file = open("mySDP.out", 'r')
+	out_file = open(name + ".out", 'r')
 	terminate_line = out_file.next()
 	terminate_reason = terminate_line.partition(" = ")[-1]
 	out_file.close()
@@ -1195,8 +1195,8 @@ class SDP:
 	    norm.append(self.table[l][temp][temp].vector[i].subs(delta, dimension))
 	
 	self.write_xml(self.unit, norm, name)
-	os.spawnlp(os.P_WAIT, "/usr/bin/sdpb", "sdpb", "-s", "mySDP.xml", "--noFinalCheckpoint")
-	out_file = open("mySDP.out", 'r')
+	os.spawnlp(os.P_WAIT, "/usr/bin/sdpb", "sdpb", "-s", name + ".xml", "--noFinalCheckpoint")
+	out_file = open(name + ".out", 'r')
 	out_file.next()
 	primal_line = out_file.next()
 	out_file.close()
@@ -1214,8 +1214,8 @@ class SDP:
 	self.write_xml(obj, self.unit, name)
 	self.set_bound(spin_irrep, old)
 	
-	os.spawnlp(os.P_WAIT, "/usr/bin/sdpb", "sdpb", "-s", "mySDP.xml", "--noFinalCheckpoint")
-	out_file = open("mySDP.out", 'r')
+	os.spawnlp(os.P_WAIT, "/usr/bin/sdpb", "sdpb", "-s", name + ".xml", "--noFinalCheckpoint")
+	out_file = open(name + ".out", 'r')
 	for i in range(0, 7):
 	    out_file.next()
 	y_line = out_file.next()
