@@ -77,12 +77,14 @@ def delta_pole(nu, k, l, series):
 # Otherwise, the result will have the symbol aux (understood as 0) in the numerator or denominator
 def delta_residue(nu, k, l, delta_12, delta_34, series):
     # Time saving special case
+    zero = 0
     two = eval_mpfr(2, prec)
     check_numerator = False
     if series != 2 and k % 2 != 0 and delta_12 == 0 and delta_34 == 0:
         return 0
     elif nu % 1 == 0:
         nu = int(nu)
+	zero = aux
     
     if series == 1:
         ret = - ((k * (-4) ** k) / (factorial(k) ** 2)) * sympy.rf((1 - k + delta_12) / two, k) * sympy.rf((1 - k + delta_34) / two, k)
@@ -96,22 +98,22 @@ def delta_residue(nu, k, l, delta_12, delta_34, series):
 	factors = [l + nu + 1 - delta_12, l + nu + 1 + delta_12, l + nu + 1 - delta_34, l + nu + 1 + delta_34]
 	
 	if l + nu == k:
-	    ret *= aux / (l + nu + k)
+	    ret *= zero / (l + nu + k)
 	else:
 	    ret *= (l + nu - k) / (l + nu + k)
 
 	if k >= l + nu and (l + nu - k) % 2 == 0:
-	    ret *= -4 * sympy.rf(-nu, nu) * factorial(k - nu) / (aux * (sympy.rf((l + nu - k + 1) / 2, k) * sympy.rf((l + nu - k) / 2, (k - l - nu) / 2) * factorial(((l + nu - k) / 2) + (k - 1))) ** 2)
+	    ret *= -4 * sympy.rf(-nu, nu) * factorial(k - nu) / (zero * (sympy.rf((l + nu - k + 1) / 2, k) * sympy.rf((l + nu - k) / 2, (k - l - nu) / 2) * factorial(((l + nu - k) / 2) + (k - 1))) ** 2)
 	elif k >= l + nu + 1 and (l + nu + 1 - k) % 2 == 0:
-	    ret *= -4 * sympy.rf(-nu, nu) * factorial(k - nu) / (aux * (sympy.rf((l + nu - k) / 2, k) * sympy.rf((l + nu - k + 1) / 2, (k - 1 - l - nu) / 2) * factorial(((l + nu - k + 1) / 2) + (k - 1))) ** 2)
+	    ret *= -4 * sympy.rf(-nu, nu) * factorial(k - nu) / (zero * (sympy.rf((l + nu - k) / 2, k) * sympy.rf((l + nu - k + 1) / 2, (k - 1 - l - nu) / 2) * factorial(((l + nu - k + 1) / 2) + (k - 1))) ** 2)
 	elif k >= nu and nu % 1 == 0:
-	    ret *= -sympy.rf(-nu, nu) * factorial(k - nu) * aux / ((sympy.rf((l + nu - k + 1) / 2, k) * sympy.rf((l + nu - k) / 2, k)) ** 2)
+	    ret *= -sympy.rf(-nu, nu) * factorial(k - nu) * zero / ((sympy.rf((l + nu - k + 1) / 2, k) * sympy.rf((l + nu - k) / 2, k)) ** 2)
 	else:
 	    ret *= sympy.rf(-nu, k + 1) / ((sympy.rf((l + nu - k + 1) / 2, k) * sympy.rf((l + nu - k) / 2, k)) ** 2)
 	
 	for f in factors:
 	    if -k < f <= k and (f - k) % 2 == 0:
-	        ret *= sympy.rf((f - k) / 2, (k - f) / 2) * factorial(((f + k) / 2) - 1) * aux / 2
+	        ret *= sympy.rf((f - k) / 2, (k - f) / 2) * factorial(((f + k) / 2) - 1) * zero / 2
 	    else:
 	        ret *= sympy.rf((f - k) / 2, k)
 		
