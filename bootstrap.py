@@ -369,22 +369,26 @@ class ConformalBlockTableSeed:
 		    current_pol_list = []
 		    pole1 = delta_pole(nu, pol_list[l][i][1], l, pol_list[l][i][3]) + pol_list[l][i][0]
 		    
+		    if dim % 2 == 0:
+		        for i_new in range(0, len(res_list[l_new])):
+		            pole2 = delta_pole(nu, pol_list[l_new][i_new][1], l_new, pol_list[l_new][i_new][3])
+		            current_pol_list.append(pole2)
+			    prod *= (pole1 - pole2) * old_den_list[l_new][i_new]
+		    
+		        den_list[l][i] = prod
+		        for j in range(0, derivative_order + 1):
+		            new_res_list[l][i].chunks[j] = new_res_list[l][i].chunks[j].mul_scalar(prod)
+		    
 		    for i_new in range(0, len(res_list[l_new])):
 		        pole2 = delta_pole(nu, pol_list[l_new][i_new][1], l_new, pol_list[l_new][i_new][3])
-		        current_pol_list.append(pole2)
-			prod *= (pole1 - pole2) * old_den_list[l_new][i_new]
-		    
-		    den_list[l][i] = prod
-		    for j in range(0, derivative_order + 1):
-		        new_res_list[l][i].chunks[j] = new_res_list[l][i].chunks[j].mul_scalar(prod)
-		    
-		    for i_new in range(0, len(res_list[l_new])):
-		        pole2 = current_pol_list[i_new]
 			
-			fact = omit_all(current_pol_list, pole2, pole1)
-			for i_other in range(0, len(res_list[l_new])):
-			    if i_other != i_new:
-			        fact *= old_den_list[l_new][i_other]
+			if dim % 2 == 0:
+			    fact = omit_all(current_pol_list, pole2, pole1)
+			    for i_other in range(0, len(res_list[l_new])):
+			        if i_other != i_new:
+			            fact *= old_den_list[l_new][i_other]
+			else:
+			    fact = eval_mpfr(1, prec) / eval_mpfr(pole1 - pole2, prec)
 			
 			for j in range(0, derivative_order + 1):
 			    for n in range(0, old_res_list.chunks[j].nrows()):
@@ -407,19 +411,20 @@ class ConformalBlockTableSeed:
 		         res_list[l][i].chunks[j] = new_res_list[l][i].chunks[j]
 	
 	# Divide by the common denominator again
-	for l in range(0, l_max + k_max + 1):
-	    for i in range(0, len(res_list[l])):
-	        if "expand" in dir(den_list[l][i]):
-	            den_list[l][i] = den_list[l][i].expand()
+	if dim % 2 == 0:
+	    for l in range(0, l_max + k_max + 1):
+	        for i in range(0, len(res_list[l])):
+	            if "expand" in dir(den_list[l][i]):
+	                den_list[l][i] = den_list[l][i].expand()
 		
-		for j in range(0, derivative_order + 1):
-		    for n in range(0, res_list[l][i].chunks[j].nrows()):
-		        element = res_list[l][i].chunks[j].get(n, 0)
-			element = element.expand()
-			element = element / den_list[l][i]
-			element = element.expand()
-			element = element.subs(aux, 0)
-			res_list[l][i].chunks[j].set(n, 0, element)
+		    for j in range(0, derivative_order + 1):
+		        for n in range(0, res_list[l][i].chunks[j].nrows()):
+		            element = res_list[l][i].chunks[j].get(n, 0)
+			    element = element.expand()
+			    element = element / den_list[l][i]
+			    element = element.expand()
+			    element = element.subs(aux, 0)
+			    res_list[l][i].chunks[j].set(n, 0, element)
 	
         # Perhaps poorly named, S keeps track of a linear combination of derivatives
         # We get this by including the essential singularity, then stripping it off again
@@ -559,8 +564,8 @@ class ConformalBlockTable:
 	c_4 = l * (l + 2 * nu) * (delta - 1) * (delta - 2 * nu - 1)
 	polys = [0, 0, 0, 0, 0]
 	poly_derivs = [[], [], [], [], []]
-	delta_prod = delta_12 * delta_34 / (-2.0)
-	delta_sum = (delta_12 - delta_34) / (-2.0)
+	delta_prod = delta_12 * delta_34 / (eval_mpfr(-2, prec))
+	delta_sum = (delta_12 - delta_34) / (eval_mpfr(-2, prec))
 	
 	# Polynomial 0 goes with the lowest order derivative on the right hand side
 	# Polynomial 3 goes with the highest order derivative on the right hand side
