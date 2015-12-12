@@ -686,7 +686,6 @@ class ConvolvedBlockTable:
 	self.m_order = []
 	self.n_order = []
 	self.table = []
-	self.unit = []
 	
 	# We can restrict to even spin when the provided table has odd spin but not vice-versa
 	if odd_spins == False and block_table.odd_spins == True:
@@ -724,10 +723,6 @@ class ConvolvedBlockTable:
 	        
 		deriv = expression / (factorial(m) * factorial(n))
 		derivatives.append(deriv)
-		
-		for i in range(len(block_table.table[0].vector) - 1, 0, -1):
-		    deriv = deriv.subs(symbol_array[block_table.n_order[i]][block_table.m_order[i]], 0)
-		self.unit.append(2 * deriv.subs(symbol_array[0][0], 1))
 	
 	for l in range(0, len(block_table.table), step):
 	    new_derivs = []
@@ -789,13 +784,12 @@ class SDP:
 	for matrix in vector_types[0][0]:
 	    chosen_tab = conv_table_list[matrix[0][0][1]]
 	    
-	    for i in range(0, len(chosen_tab.unit)):
+	    for i in range(0, len(chosen_tab.table[0].vector)):
 	        unit = 0
 	        for r in range(0, len(matrix)):
 	            for s in range(0, len(matrix[r])):
 		        quad = matrix[r][s]
 	                tab = conv_table_list[quad[1]]
-			#unit += quad[0] * tab.unit[i].subs(delta_ext, (dim_list[quad[2]] + dim_list[quad[3]]) / 2.0)
 			unit += quad[0] * tab.table[0].vector[i].subs(delta, 0).subs(delta_ext, (dim_list[quad[2]] + dim_list[quad[3]]) / 2.0)
 		
 		self.m_order.append(chosen_tab.m_order[i])
