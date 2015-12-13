@@ -18,6 +18,7 @@ mpmath.mp.dps = int((3.0 / 10.0) * prec)
 rho_cross = 3 - 2 * mpmath.sqrt(2)
 r_cross = eval_mpfr(3 - 2 * sqrt(2), prec)
 
+ell = symbols('ell')
 delta  = symbols('delta')
 delta_ext = symbols('delta_ext')
 aux = symbols('aux')
@@ -121,10 +122,10 @@ def delta_residue(nu, k, l, delta_12, delta_34, series):
     else:
 	return - ((k * (-4) ** k) / (factorial(k) ** 2)) * (sympy.rf(1 + l - k, k) * sympy.rf((1 - k + delta_12) / two, k) * sympy.rf((1 - k + delta_34) / two, k) / sympy.rf(1 + nu + l - k, k))
 
-def omit_all(poles, special_pole, var):
+def omit_all(poles, special_poles, var):
     expression = 1
     for p in poles:
-        if p != special_pole:
+	if not p in special_poles:
 	    expression *= (var - p)
     return expression
 
@@ -224,7 +225,7 @@ class ConformalBlockVector:
 	    
 	    if pole in self.large_poles:
 	        for j in range(0, derivative_order + 1):
-	            self.chunks[j] = self.chunks[j].add_matrix(res_list[k].chunks[j].mul_scalar(omit_all(self.large_poles, pole, delta)))
+	            self.chunks[j] = self.chunks[j].add_matrix(res_list[k].chunks[j].mul_scalar(omit_all(self.large_poles, [pole], delta)))
 	    else:
 	        vector = []
 		for i in range(0, len(self.large_poles) / 2):
@@ -235,7 +236,7 @@ class ConformalBlockVector:
 		vector = matrix.mul_matrix(vector)
 		for i in range(0, len(self.large_poles)):
 		    for j in range(0, derivative_order + 1):
-		        self.chunks[j] = self.chunks[j].add_matrix(res_list[k].chunks[j].mul_scalar(vector.get(i, 0) * omit_all(self.large_poles, self.large_poles[i], delta)))
+		        self.chunks[j] = self.chunks[j].add_matrix(res_list[k].chunks[j].mul_scalar(vector.get(i, 0) * omit_all(self.large_poles, [self.large_poles[i]], delta)))
 	
 	for j in range(0, derivative_order + 1):
 	    s_sub = s_matrix.submatrix(0, derivative_order - j, 0, derivative_order - j)
@@ -385,7 +386,7 @@ class ConformalBlockTableSeed:
 		        pole2 = delta_pole(nu, pol_list[l_new][i_new][1], l_new, pol_list[l_new][i_new][3])
 			
 			if dim % 2 == 0:
-			    fact = omit_all(current_pol_list, pole2, pole1)
+			    fact = omit_all(current_pol_list, [pole2], pole1)
 			    for i_other in range(0, len(res_list[l_new])):
 			        if i_other != i_new:
 			            fact *= old_den_list[l_new][i_other]
@@ -675,7 +676,7 @@ class ConformalBlockTable:
         dump_table_contents(self, name)
 
 class ConvolvedBlockTable:
-    def __init__(self, block_table, odd_spins = True, symmetric = False):
+    def __init__(self, block_table, odd_spins = True, symmetric = False, content = [[1, 0, 0]]):
         # Copying everything but the unconvolved table is fine from a memory standpoint
         self.dim = block_table.dim
 	self.k_max = block_table.k_max
@@ -687,13 +688,20 @@ class ConvolvedBlockTable:
 	self.n_order = []
 	self.table = []
 	
+	max_spin_shift = 0
+	for trip in content:
+	    max_spin_shift = max(max_spin_shift, trip[2])
+	self.l_max -= max_spin_shift
+	
 	# We can restrict to even spin when the provided table has odd spin but not vice-versa
 	if odd_spins == False and block_table.odd_spins == True:
 	    self.odd_spins = False
-	    step = 2
 	else:
 	    self.odd_spins = block_table.odd_spins
+	if block_table.odd_spins == True:
 	    step = 1
+	else:
+	    step = 2
 	
 	symbol_array = []
 	for n in range(0, block_table.n_max + 1):
@@ -724,14 +732,63 @@ class ConvolvedBlockTable:
 		deriv = expression / (factorial(m) * factorial(n))
 		derivatives.append(deriv)
 	
-	for l in range(0, len(block_table.table), step):
+	spin = 0
+	combined_block_table = []
+	while spin <= self.l_max:
+	    vector = []
+	    l = spin / step
+	    
+	    # Different blocks in the linear combination may be divided by different poles
+	    all_poles = []
+	    for trip in content:
+	        del_shift = trip[1]
+	        ell_shift = trip[2] / step
+		if l + ell_shift >= 0:
+		    for p in block_table.table[l + ell_shift].poles:
+		        new = True
+			for q in all_poles:
+			    if abs(float(p - del_shift - q)) < 1e-10:
+			        new = False
+				break
+			if new:
+			    all_poles.append(p - del_shift)
+	    
+	    for i in range(0, len(block_table.table[l].vector)):
+	        entry = 0
+		for trip in content:
+		    if "subs" in dir(trip[0]):
+		        coeff = trip[0].subs(ell, spin)
+		    else:
+		        coeff = trip[0]
+		    del_shift = trip[1]
+		    ell_shift = trip[2] / step
+		    
+		    if l + ell_shift >= 0:
+			for p in all_poles:
+			    new = True
+			    for q in block_table.table[l + ell_shift].poles:
+			        if abs(float(p + del_shift - q)) < 1e-10:
+				    new = False
+				    break
+			    if new:
+			        coeff *= delta - p
+		        entry += coeff * block_table.table[l + ell_shift].vector[i].subs(delta, delta + del_shift)
+	        vector.append(entry.expand())
+	    
+	    combined_block_table.append(PolynomialVector(vector, [spin, 0], all_poles))
+	    if self.odd_spins:
+	        spin += 1
+	    else:
+	        spin += 2
+	
+	for l in range(0, len(combined_block_table)):
 	    new_derivs = []
 	    for i in range(0, len(derivatives)):
 	        deriv = derivatives[i]
-	        for j in range(len(block_table.table[0].vector) - 1, 0, -1):
-		    deriv = deriv.subs(symbol_array[block_table.n_order[j]][block_table.m_order[j]], block_table.table[l].vector[j])
-		new_derivs.append(2 * deriv.subs(symbol_array[0][0], block_table.table[l].vector[0]))
-	    self.table.append(PolynomialVector(new_derivs, block_table.table[l].label, block_table.table[l].poles))
+	        for j in range(len(combined_block_table[l].vector) - 1, 0, -1):
+		    deriv = deriv.subs(symbol_array[block_table.n_order[j]][block_table.m_order[j]], combined_block_table[l].vector[j])
+		new_derivs.append(2 * deriv.subs(symbol_array[0][0], combined_block_table[l].vector[0]))
+	    self.table.append(PolynomialVector(new_derivs, combined_block_table[l].label, combined_block_table[l].poles))
 
 class SDP:
     def __init__(self, dim_list, conv_table_list, vector_types = [[[[[[1, 0, 0, 0]]]], 0, 0]], prototype = None):
