@@ -1,4 +1,5 @@
 #!/usr/bin/env python2
+from __future__ import print_function
 import xml.dom.minidom
 import numpy.polynomial
 import mpmath
@@ -275,7 +276,6 @@ class ConformalBlockTableSeed:
             exec command
             return
 
-        print "Calculating residues"
         conformal_blocks = []
         derivative_order = m_max + 2 * n_max
 
@@ -455,7 +455,6 @@ class ConformalBlockTableSeed:
         old_expression1 = sqrt(a ** 2 - b) / (hack + sqrt((hack - a) ** 2 - b) + hack * sqrt(hack - a + sqrt((hack - a) ** 2 - b)))
         old_expression2 = (hack - sqrt((hack - a) ** 2 - b)) / sqrt(a ** 2 - b)
 
-        print "Differentiating radial co-ordinates"
         for n in range(0, m_max + 2 * n_max + 1):
             old_coeff_grid.append([0] * (m_max + 2 * n_max + 1))
 
@@ -478,7 +477,6 @@ class ConformalBlockTableSeed:
                 self.m_order.append(m)
                 self.n_order.append(n)
 
-        print "Putting them together"
         old_coeff_grid[0][0] = 1
         order = 0
 
@@ -1064,7 +1062,6 @@ class SDP:
         extra_vectors = []
 
         # Handle discretely added points
-        print "Adding isolated points"
         for p in self.points:
             for l in range(0, len(self.table)):
                 if self.table[l][0][0].label == p[0]:
@@ -1148,7 +1145,6 @@ class SDP:
                         vector_node.appendChild(polynomial_node)
                     elements_node.appendChild(vector_node)
 
-            print "Getting points"
             poles = self.table[j][0][0].poles
             index = self.get_index(laguerre_degrees, degree)
             if j >= len(self.bounds):
@@ -1160,7 +1156,6 @@ class SDP:
             else:
                 points = laguerre_points[index]
 
-            print "Evaluating them"
             for d in range(0, degree + 1):
                 elt_node = doc.createElement("elt")
                 elt_node.appendChild(doc.createTextNode(points[d].__str__()))
@@ -1224,7 +1219,7 @@ class SDP:
         old = self.get_bound(spin_irrep)
         while abs(upper - lower) > threshold:
             test = (lower + upper) / 2.0
-            print "Trying " + test.__str__()
+            print("Trying " + test.__str__())
 
             result = self.iterate(test, spin_irrep)
             if result == False:
@@ -1245,7 +1240,7 @@ class SDP:
 
         temp = 0
         if len(self.table[l]) > 1:
-            print "Only supported for 1x1 matrices"
+            print("Only supported for 1x1 matrices")
             return 0.0
 
         norm = []
@@ -1302,7 +1297,7 @@ class SDP:
 
                 temp = 0
                 if len(self.table[l]) > 1:
-                    print "Only supported for 1x1 matrices"
+                    print("Only supported for 1x1 matrices")
                     return 0.0
 
                 polynomial_vector = self.table[l][temp][temp].vector[i].subs(delta, dimensions[j])
