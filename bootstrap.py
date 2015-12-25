@@ -205,10 +205,10 @@ class ConformalBlockVector:
 
         matrix = []
         if self.small_poles != []:
-            for i in range(0, len(self.large_poles) / 2):
+            for i in range(0, len(self.large_poles) // 2):
                 for j in range(0, len(self.large_poles)):
                     matrix.append(1 / ((unitarity_bound(dim, l) - self.large_poles[j]) ** (i + 1)))
-            for i in range(0, len(self.large_poles) - (len(self.large_poles) / 2)):
+            for i in range(0, len(self.large_poles) - (len(self.large_poles) // 2)):
                 for j in range(0, len(self.large_poles)):
                     matrix.append(1 / (((1 / cutoff) - self.large_poles[j]) ** (i + 1)))
             matrix = DenseMatrix(len(self.large_poles), len(self.large_poles), matrix)
@@ -229,9 +229,9 @@ class ConformalBlockVector:
                     self.chunks[j] = self.chunks[j].add_matrix(res_list[k].chunks[j].mul_scalar(omit_all(self.large_poles, [pole], delta)))
             else:
                 vector = []
-                for i in range(0, len(self.large_poles) / 2):
+                for i in range(0, len(self.large_poles) // 2):
                     vector.append(1 / ((unitarity_bound(dim, l) - pole) ** (i + 1)))
-                for i in range(0, len(self.large_poles) - (len(self.large_poles) / 2)):
+                for i in range(0, len(self.large_poles) - (len(self.large_poles) // 2)):
                     vector.append(1 / (((1 / cutoff) - pole) ** (i + 1)))
                 vector = DenseMatrix(len(self.large_poles), 1, vector)
                 vector = matrix.mul_matrix(vector)
@@ -273,7 +273,7 @@ class ConformalBlockTableSeed:
         if name != None:
             dump_file = open(name, 'r')
             command = dump_file.read()
-            exec command
+            exec(command)
             return
 
         conformal_blocks = []
@@ -317,8 +317,8 @@ class ConformalBlockTableSeed:
                         current_pol_list.append((k, k, l + k, 1))
 
                 if k % 2 == 0:
-                    if delta_residue(nu, k / 2, l, delta_12, delta_34, 2) != 0:
-                        current_pol_list.append((k, k / 2, l, 2))
+                    if delta_residue(nu, k // 2, l, delta_12, delta_34, 2) != 0:
+                        current_pol_list.append((k, k // 2, l, 2))
 
                 if k <= l:
                     if delta_residue(nu, k, l, delta_12, delta_34, 3) != 0:
@@ -550,7 +550,7 @@ class ConformalBlockTable:
         if name != None:
             dump_file = open(name, 'r')
             command = dump_file.read()
-            exec command
+            exec(command)
             return
 
         small_table = ConformalBlockTableSeed(dim, k_max, l_max, min(m_max + 2 * n_max, 3), 0, delta_12, delta_34, odd_spins)
@@ -734,13 +734,13 @@ class ConvolvedBlockTable:
         combined_block_table = []
         while spin <= self.l_max:
             vector = []
-            l = spin / step
+            l = spin // step
 
             # Different blocks in the linear combination may be divided by different poles
             all_poles = []
             for trip in content:
                 del_shift = trip[1]
-                ell_shift = trip[2] / step
+                ell_shift = trip[2] // step
                 if l + ell_shift >= 0:
                     for p in block_table.table[l + ell_shift].poles:
                         new = True
@@ -759,7 +759,7 @@ class ConvolvedBlockTable:
                     else:
                         coeff = trip[0]
                     del_shift = trip[1]
-                    ell_shift = trip[2] / step
+                    ell_shift = trip[2] // step
 
                     if l + ell_shift >= 0:
                         for p in all_poles:
@@ -874,7 +874,7 @@ class SDP:
                             if tab.odd_spins:
                                 index = l
                             else:
-                                index = l / 2
+                                index = l // 2
 
                             for i in range(0, len(tab.table[index].vector)):
                                 derivatives.append(quad[0] * tab.table[index].vector[i].subs(delta_ext, (dim_list[quad[2]] + dim_list[quad[3]]) / 2.0))
@@ -950,12 +950,12 @@ class SDP:
                         coeff_list = expression.args
                     degree = max(degree, len(coeff_list) - 1)
 
-        for d in range(0, 2 * (degree / 2) + 1):
+        for d in range(0, 2 * (degree // 2) + 1):
             result = self.integral(d, delta_min, poles)
             bands.append(result)
-        for r in range(0, (degree / 2) + 1):
+        for r in range(0, (degree // 2) + 1):
             new_entries = []
-            for s in range(0, (degree / 2) + 1):
+            for s in range(0, (degree // 2) + 1):
                 new_entries.append(bands[r + s])
             matrix.append(new_entries)
 
@@ -1174,7 +1174,7 @@ class SDP:
             else:
                 matrix = self.basis[j]
 
-            for d in range(0, (degree / 2) + 1):
+            for d in range(0, (degree // 2) + 1):
                 polynomial_node = doc.createElement("polynomial")
                 for q in range(0, d + 1):
                     coeff_node = doc.createElement("coeff")
@@ -1191,7 +1191,7 @@ class SDP:
             matrices_node.appendChild(matrix_node)
 
         self.table = self.table[:len(self.bounds)]
-        xml_file = open(name + ".xml", 'wb')
+        xml_file = open(name + ".xml", 'w')
         doc.writexml(xml_file, addindent = "    ", newl = '\n')
         xml_file.close()
         doc.unlink()
@@ -1206,7 +1206,7 @@ class SDP:
 
         os.spawnlp(os.P_WAIT, "/usr/bin/sdpb", "sdpb", "-s", name + ".xml", "--precision=" + str(prec), "--findPrimalFeasible", "--findDualFeasible", "--noFinalCheckpoint")
         out_file = open(name + ".out", 'r')
-        terminate_line = out_file.next()
+        terminate_line = next(out_file)
         terminate_reason = terminate_line.partition(" = ")[-1]
         out_file.close()
 
@@ -1250,8 +1250,8 @@ class SDP:
         self.write_xml(self.unit, norm, name)
         os.spawnlp(os.P_WAIT, "/usr/bin/sdpb", "sdpb", "-s", name + ".xml", "--precision=" + str(prec), "--noFinalCheckpoint")
         out_file = open(name + ".out", 'r')
-        out_file.next()
-        primal_line = out_file.next()
+        next(out_file)
+        primal_line = next(out_file)
         out_file.close()
 
         primal_value = primal_line.partition(" = ")[-1][:-2]
@@ -1270,15 +1270,15 @@ class SDP:
         os.spawnlp(os.P_WAIT, "/usr/bin/sdpb", "sdpb", "-s", name + ".xml", "--precision=" + str(prec), "--noFinalCheckpoint")
         out_file = open(name + ".out", 'r')
         for i in range(0, 7):
-            out_file.next()
-        y_line = out_file.next()
+            next(out_file)
+        y_line = next(out_file)
         y_line = y_line.partition(" = ")[-1][1:-3]
 
         component_strings = y_line.split(", ")
         components = [eval_mpfr(1.0, prec)]
         for num in component_strings:
             command = "components.append(eval_mpfr(" + num + ", prec))"
-            exec command
+            exec(command)
 
         return components
 
