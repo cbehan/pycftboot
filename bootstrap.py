@@ -516,7 +516,9 @@ class ConformalBlockTableSeed:
                         for j in range(0, m + n - i + 1):
                             if type(deriv[i][j]) != type(1):
                                 deriv[i][j] = deriv[i][j].subs(Derivative(r, [a] * self.m_order[l] + [b] * self.n_order[l]), rules1[l])
+                                deriv[i][j] = deriv[i][j].subs(Derivative(r, [b] * self.n_order[l] + [a] * self.m_order[l]), rules1[l])
                                 deriv[i][j] = deriv[i][j].subs(Derivative(eta, [a] * self.m_order[l] + [b] * self.n_order[l]), rules2[l])
+                                deriv[i][j] = deriv[i][j].subs(Derivative(eta, [b] * self.n_order[l] + [a] * self.m_order[l]), rules2[l])
 
                 # Replace conformal block derivatives similarly for each spin
                 for l in range(0, len(conformal_blocks)):
