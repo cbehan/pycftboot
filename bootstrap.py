@@ -1015,13 +1015,16 @@ class SDP:
     m_order:         Analogous to `n_order` in `ConformalBlockTable` or
                      `ConvolvedBlockTable`, this keeps track of the number of `b`
                      derivatives in these longer `PolynomialVector`s.
+    options:         A list of strings where each string is a command line option
+                     that will be passed when `SDPB` is run from this `SDP`. This
+                     list should be touched with `set_option` and not directly.
     points:          In addition to `PolynomialVector`s whose entries allow `delta`
                      to take any positive value, the user may also include in the
                      sum rule `PolynomialVector`s whose entries are pure numbers.
                      In other words, she may evaluate some of them once and for all
                      at particular values of `delta` to force certain operators to
                      appear in the spectrum. A method `add_point` is included to
-                     build this list. It should oly be touched when being reset to
+                     build this list. It should only be touched when being reset to
                      the empty list.
     unit:            A list which gives the `PolynomialVector` corresponding to the
                      identity. This is obtained simply by plugging `delta = 0` into
@@ -1129,6 +1132,7 @@ class SDP:
                 self.table.append(outer_list)
 
         self.bounds = [0.0] * len(self.table)
+        self.options = []
 
         if prototype == None:
             self.basis = [0] * len(self.table)
@@ -1175,7 +1179,6 @@ class SDP:
                 if self.table[l][0][0].label == gapped_spin_irrep:
                     return self.bounds[l]
 
-    # Defaults to unitarity bounds if there are missing arguments
     def set_bound(self, gapped_spin_irrep = -1, delta_min = -1, reset_basis = True):
         """
         Sets the minimum scaling dimension of a given operator in the sum rule. If
@@ -1220,6 +1223,38 @@ class SDP:
 
             if reset_basis:
                 self.set_basis(l)
+
+    def set_option(self, key = None, value = None):
+        """
+        Sets the value of a switch that should be passed to `SDPB` on the command
+        line. `SDPB` options that do not take a parameter are handled by other
+        methods so it should not be necessary to pass them.
+
+        Parameters
+        ----------
+        key:   [Optional] The name of the `SDPB` parameter being set without any
+               "--" at the beginning or "=" at the end. No checking is done to
+               ensure that it is a valid parameter. Defaults to `None` which means
+               all parameters will be reset to their default values.
+        value: [Optional] The string or numerical value that should accompany `key`.
+               Defaults to `None` which means that the parameter for `key` will be
+               reset to its default value.
+        """
+        if key == None:
+            self.options = []
+        else:
+            found = False
+            opt_string = "--" + key + "="
+            for i in range(0, len(self.options)):
+                if self.options[i][:len(opt_string)] == opt_string:
+                    found = True
+                    break
+            if found == True and value == None:
+                self.options = self.options[:i] + self.options[i + 1:]
+            elif found == True and value != None:
+                self.options[i] = opt_string + str(value)
+            elif found == False and value != None:
+                self.options.append(opt_string + str(value))
 
     def set_basis(self, index):
         """
@@ -1596,7 +1631,7 @@ class SDP:
         self.set_bound(spin_irrep, test)
         self.write_xml(obj, self.unit, name)
 
-        os.spawnlp(os.P_WAIT, "/usr/bin/sdpb", "sdpb", "-s", name + ".xml", "--precision=" + str(prec), "--findPrimalFeasible", "--findDualFeasible", "--noFinalCheckpoint")
+        os.spawnvp(os.P_WAIT, "/usr/bin/sdpb", ["sdpb", "-s", name + ".xml", "--precision=" + str(prec), "--findPrimalFeasible", "--findDualFeasible", "--noFinalCheckpoint"] + self.options)
         out_file = open(name + ".out", 'r')
         terminate_line = next(out_file)
         terminate_reason = terminate_line.partition(" = ")[-1]
@@ -1672,7 +1707,7 @@ class SDP:
             norm.append(self.table[l][temp][temp].vector[i].subs(delta, dimension))
 
         self.write_xml(self.unit, norm, name)
-        os.spawnlp(os.P_WAIT, "/usr/bin/sdpb", "sdpb", "-s", name + ".xml", "--precision=" + str(prec), "--noFinalCheckpoint")
+        os.spawnvp(os.P_WAIT, "/usr/bin/sdpb", ["sdpb", "-s", name + ".xml", "--precision=" + str(prec), "--noFinalCheckpoint"] + self.options)
         out_file = open(name + ".out", 'r')
         next(out_file)
         primal_line = next(out_file)
@@ -1707,7 +1742,7 @@ class SDP:
         self.write_xml(obj, self.unit, name)
         self.set_bound(spin_irrep, old)
 
-        os.spawnlp(os.P_WAIT, "/usr/bin/sdpb", "sdpb", "-s", name + ".xml", "--precision=" + str(prec), "--noFinalCheckpoint")
+        os.spawnvp(os.P_WAIT, "/usr/bin/sdpb", ["sdpb", "-s", name + ".xml", "--precision=" + str(prec), "--noFinalCheckpoint"] + self.options)
         out_file = open(name + ".out", 'r')
         for i in range(0, 7):
             next(out_file)
