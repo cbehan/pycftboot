@@ -1023,9 +1023,8 @@ class SDP:
                      sum rule `PolynomialVector`s whose entries are pure numbers.
                      In other words, she may evaluate some of them once and for all
                      at particular values of `delta` to force certain operators to
-                     appear in the spectrum. A method `add_point` is included to
-                     build this list. It should only be touched when being reset to
-                     the empty list.
+                     appear in the spectrum. This list should be touched with
+                     `add_point` and not directly.
     unit:            A list which gives the `PolynomialVector` corresponding to the
                      identity. This is obtained simply by plugging `delta = 0` into
                      the zero spin singlet channel. If such a channel involves
@@ -1143,22 +1142,37 @@ class SDP:
                 self.basis.append(mat)
             self.set_bound(reset_basis = False)
 
-    def add_point(self, spin_irrep, dimension):
+    def add_point(self, spin_irrep = -1, dimension = -1):
         """
         Tells the `SDP` that a particular fixed operator should be included in the
-        sum rule.
+        sum rule. If called with one argument, all points with that label will be
+        removed. If called with no arguments, all points with any label will be
+        removed.
 
         Parameters
         ----------
-        spin_irrep: An ordered pair used to label the `PolynomialVector` for the
-                    operator. The first entry is the spin, the second is the label
-                    which must be found in `vector_types` for the `SDP`. If only an
-                    integer is given, the second entry is assumed to be 0.
-        dimension:  The scaling dimension of the operator being added.
+        spin_irrep: [Optional] An ordered pair used to label the `PolynomialVector`
+                    for the operator. The first entry is the spin, the second is the
+                    label which must be found in `vector_types` or 0 if not present.
+                    Defaults to -1 which means all operators.
+        dimension:  [Optional] The scaling dimension of the operator being added.
+                    Defaults to -1 which means the point should be removed.
         """
+        if spin_irrep == -1:
+            self.points = []
+            return
+
         if type(spin_irrep) == type(1):
             spin_irrep = [spin_irrep, 0]
-        self.points.append((spin_irrep, dimension))
+        if dimension != -1:
+            self.points.append((spin_irrep, dimension))
+        else:
+            i = 0
+            while i < len(self.points):
+                if self.points[i][0] == spin_irrep:
+                    self.points = self.points[:i] + self.points[i + 1:]
+                else:
+                    i += 1
 
     def get_bound(self, gapped_spin_irrep):
         """
