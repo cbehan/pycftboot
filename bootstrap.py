@@ -1626,23 +1626,15 @@ class SDP:
 
     def iterate(self, test, spin_irrep, name = "mySDP"):
         """
-        Returns `True` if this `SDP` with a particular specified gap is solvable
-        and `False` otherwise.
+        Returns `True` if this `SDP` with its current gaps is solvable and
+        `False` otherwise.
 
         Parameters
         ----------
-        test:       The minimum value of the scaling dimension to test.
-        spin_irrep: An ordered pair of the type passed to `set_bound`. Used to label
-                    the spin and representation of the operator whose dimension is
-                    being bounded.
         name:       [Optional] The name of the XML file generated in the process
                     without any ".xml" at the end. Defaults to "mySDP".
         """
-        if type(spin_irrep) == type(1):
-            spin_irrep = [spin_irrep, 0]
-
         obj = [0.0] * len(self.table[0][0][0].vector)
-        self.set_bound(spin_irrep, test)
         self.write_xml(obj, self.unit, name)
 
         os.spawnvp(os.P_WAIT, "/usr/bin/sdpb", ["sdpb", "-s", name + ".xml", "--precision=" + str(prec), "--findPrimalFeasible", "--findDualFeasible", "--noFinalCheckpoint"] + self.options)
@@ -1676,7 +1668,8 @@ class SDP:
             test = (lower + upper) / 2.0
             print("Trying " + test.__str__())
 
-            result = self.iterate(test, spin_irrep)
+            self.set_bound(spin_irrep, test)
+            result = self.iterate()
             if result == False:
                 upper = test
             else:
