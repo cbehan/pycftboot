@@ -1624,7 +1624,7 @@ class SDP:
         xml_file.close()
         doc.unlink()
 
-    def iterate(self, test, spin_irrep, name = "mySDP"):
+    def iterate(self, name = "mySDP"):
         """
         Returns `True` if this `SDP` with its current gaps is solvable and
         `False` otherwise.
