@@ -172,7 +172,7 @@ class ConformalBlockVector:
         if self.small_poles != []:
             for i in range(0, len(self.large_poles) // 2):
                 for j in range(0, len(self.large_poles)):
-                    matrix.append(1 / ((unitarity_bound(dim, l) - self.large_poles[j]) ** (i + 1)))
+                    matrix.append(1 / ((cutoff + unitarity_bound(dim, l) - self.large_poles[j]) ** (i + 1)))
             for i in range(0, len(self.large_poles) - (len(self.large_poles) // 2)):
                 for j in range(0, len(self.large_poles)):
                     matrix.append(1 / (((1 / cutoff) - self.large_poles[j]) ** (i + 1)))
