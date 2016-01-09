@@ -1831,7 +1831,7 @@ class SDP:
             spin_irrep = [spin_irrep, 0]
 
         for l in range(0, len(self.table)):
-            if self.table[l].label == spin_irrep:
+            if self.table[l][0][0].label == spin_irrep:
                 break
 
         entries = []
@@ -1870,6 +1870,6 @@ class SDP:
         ret = []
         bound = self.get_bound(spin_irrep)
         for dim in roots:
-            if dim == dim.conj() and dim.real > (bound - 0.01):
+            if dim.imag > -1e-10 and dim.imag < 0.1 and dim.real > (bound - 0.01):
                 ret.append(dim.real)
         return ret
