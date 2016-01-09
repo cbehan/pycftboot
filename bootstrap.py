@@ -1626,8 +1626,8 @@ class SDP:
 
     def iterate(self, name = "mySDP"):
         """
-        Returns `True` if this `SDP` with its current gaps is solvable and
-        `False` otherwise.
+        Returns `True` if this `SDP` with its current gaps represents an allowed CFT
+        and `False` otherwise.
 
         Parameters
         ----------
