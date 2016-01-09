@@ -1682,15 +1682,13 @@ class SDP:
         """
         Returns the maximum allowed value of the squared OPE coefficient for an
         operator with a prescribed scaling dimension, spin and global symmetry
-        representation.
+        representation. It is best to compare several OPE coefficients so that
+        numerical artifacts cancel out.
 
         Parameters
         ----------
         dimension:  The scaling dimension of the operator whose OPE coefficient is
-                    being bounded. As explained in arXiv:1412.4127, to find the
-                    physical OPE coefficient, the result must be multiplied by (4r)
-                    raised the the power of this dimension where r is the crossing
-                    symmetric value of the radial co-ordinate.
+                    being bounded.
         spin_irrep: An ordered pair of the type passed to `set_bound`. Used to label
                     the spin and representation of the operator whose OPE
                     coefficient is being bounded.
@@ -1704,16 +1702,21 @@ class SDP:
             if self.table[l][0][0].label == spin_irrep:
                 break
 
-        temp = 0
         if len(self.table[l]) > 1:
             print("Only supported for 1x1 matrices")
             return 0.0
 
-        norm = []
-        for i in range(0, len(self.table[l][0][0].vector)):
-            norm.append(self.table[l][temp][temp].vector[i].subs(delta, dimension))
+        prod = 1
+        for p in self.table[0][0][0].poles:
+            prod *= -p
 
-        self.write_xml(self.unit, norm, name)
+        obj = []
+        norm = []
+        for i in range(0, len(self.unit)):
+            norm.append(self.table[l][0][0].vector[i].subs(delta, dimension))
+            obj.append(self.unit[i] / prod)
+
+        self.write_xml(obj, norm, name)
         os.spawnvp(os.P_WAIT, "/usr/bin/sdpb", ["sdpb", "-s", name + ".xml", "--precision=" + str(prec), "--noFinalCheckpoint"] + self.options)
         out_file = open(name + ".out", 'r')
         next(out_file)
