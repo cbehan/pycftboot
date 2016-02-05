@@ -96,25 +96,32 @@ def delta_pole(nu, k, l, series):
         return eval_mpfr(pole, prec)
 
 class LeadingBlockVector:
-    def __init__(self, dim, l, delta_12, delta_34, derivative_order):
+    def __init__(self, dim, l, m_max, n_max, delta_12, delta_34):
         self.spin = l
-        self.derivative_order = derivative_order
+        self.m_max = m_max
+        self.n_max = n_max
         self.chunks = []
 
         r = symbols('r')
         eta = symbols('eta')
         nu = sympy.Rational(dim, 2) - 1
+        derivative_order = m_max + 2 * n_max
+
+        # With only a derivatives, we never need eta derivatives
+        off_diag_order = derivative_order
+        if n_max == 0:
+            off_diag_order = 0
 
         # We cache derivatives as we go
         # This is because csympy can only compute them one at a time, but it's faster anyway
         old_expression = self.leading_block(nu, r, eta, l, delta_12, delta_34)
 
-        for m in range(0, derivative_order + 1):
+        for n in range(0, off_diag_order + 1):
             chunk = []
-            for n in range(0, derivative_order - m + 1):
+            for m in range(0, derivative_order - n + 1):
                 if n == 0 and m == 0:
                     expression = old_expression
-                elif n == 0:
+                elif m == 0:
                     old_expression = old_expression.diff(eta)
                     expression = old_expression
                 else:
@@ -124,7 +131,9 @@ class LeadingBlockVector:
             self.chunks.append(DenseMatrix(len(chunk), 1, chunk))
 
     def leading_block(self, nu, r, eta, l, delta_12, delta_34):
-        if nu == 0:
+        if self.n_max == 0:
+            ret = 1
+        elif nu == 0:
             ret = sympy.chebyshevt(l, eta)
         else:
             ret = factorial(l) * sympy.gegenbauer(l, nu, eta) / sympy.rf(2 * nu, l)
@@ -179,7 +188,7 @@ class ConformalBlockVector:
             matrix = DenseMatrix(len(self.large_poles), len(self.large_poles), matrix)
             matrix = matrix.inv()
 
-        for j in range(0, derivative_order + 1):
+        for j in range(0, len(leading_block.chunks)):
             self.chunks.append(leading_block.chunks[j])
             for p in self.large_poles:
                 self.chunks[j] = self.chunks[j].mul_scalar(delta - p)
@@ -190,7 +199,7 @@ class ConformalBlockVector:
                 pole = pole.subs(aux, 0)
 
             if pole in self.large_poles:
-                for j in range(0, derivative_order + 1):
+                for j in range(0, len(self.chunks)):
                     self.chunks[j] = self.chunks[j].add_matrix(res_list[k].chunks[j].mul_scalar(omit_all(self.large_poles, [pole], delta)))
             else:
                 vector = []
@@ -201,10 +210,10 @@ class ConformalBlockVector:
                 vector = DenseMatrix(len(self.large_poles), 1, vector)
                 vector = matrix.mul_matrix(vector)
                 for i in range(0, len(self.large_poles)):
-                    for j in range(0, derivative_order + 1):
+                    for j in range(0, len(self.chunks)):
                         self.chunks[j] = self.chunks[j].add_matrix(res_list[k].chunks[j].mul_scalar(vector.get(i, 0) * omit_all(self.large_poles, [self.large_poles[i]], delta)))
 
-        for j in range(0, derivative_order + 1):
+        for j in range(0, len(self.chunks)):
             s_sub = s_matrix.submatrix(0, derivative_order - j, 0, derivative_order - j)
             self.chunks[j] = s_sub.mul_matrix(self.chunks[j])
 
@@ -264,8 +273,8 @@ class ConformalBlockTableSeed:
             exec(command)
             return
 
-        conformal_blocks = []
         derivative_order = m_max + 2 * n_max
+        nu = sympy.Rational(dim, 2) - 1
 
         # The matrix for how derivatives are affected when one multiplies by r
         r_powers = []
@@ -283,8 +292,7 @@ class ConformalBlockTableSeed:
         r_powers.append(identity)
         r_powers.append(r_matrix)
 
-        derivative_order = m_max + 2 * n_max
-        nu = sympy.Rational(dim, 2) - 1
+        conformal_blocks = []
         leading_blocks = []
         pol_list = []
         res_list = []
@@ -295,7 +303,7 @@ class ConformalBlockTableSeed:
 
         # Find out which residues we will ever need to include
         for l in range(0, l_max + k_max + 1):
-            lb = LeadingBlockVector(dim, l, delta_12, delta_34, derivative_order)
+            lb = LeadingBlockVector(dim, l, m_max, n_max, delta_12, delta_34)
             leading_blocks.append(lb)
             current_pol_list = []
 
@@ -344,7 +352,7 @@ class ConformalBlockTableSeed:
                     res = self.delta_residue(nu, pol_list[l][i][1], l, delta_12, delta_34, pol_list[l][i][3])
                     pow_list[l][i] += pol_list[l][i][0]
 
-                    for j in range(0, derivative_order + 1):
+                    for j in range(0, len(res_list[l][i].chunks)):
                         r_sub = r_powers[pol_list[l][i][0]].submatrix(0, derivative_order - j, 0, derivative_order - j)
                         res_list[l][i].chunks[j] = r_sub.mul_matrix(res_list[l][i].chunks[j]).mul_scalar(res)
 
@@ -367,7 +375,7 @@ class ConformalBlockTableSeed:
                             prod *= (pole1 - pole2) * old_den_list[l_new][i_new]
 
                         den_list[l][i] = prod
-                        for j in range(0, derivative_order + 1):
+                        for j in range(0, len(new_res_list[l][i].chunks)):
                             new_res_list[l][i].chunks[j] = new_res_list[l][i].chunks[j].mul_scalar(prod)
 
                     for i_new in range(0, len(res_list[l_new])):
@@ -381,7 +389,7 @@ class ConformalBlockTableSeed:
                         else:
                             fact = eval_mpfr(1, prec) / eval_mpfr(pole1 - pole2, prec)
 
-                        for j in range(0, derivative_order + 1):
+                        for j in range(0, len(old_res_list.chunks)):
                             for n in range(0, old_res_list.chunks[j].nrows()):
                                 element = res_list[l_new][i_new].chunks[j].get(n, 0)
                                 element = element * fact
@@ -398,7 +406,7 @@ class ConformalBlockTableSeed:
                         den_list[l][i] = den_list[l][i].expand()
                     old_den_list[l][i] = den_list[l][i]
 
-                    for j in range(0, derivative_order + 1):
+                    for j in range(0, len(res_list[l][i].chunks)):
                          res_list[l][i].chunks[j] = new_res_list[l][i].chunks[j]
 
         # Divide by the common denominator again
@@ -408,7 +416,7 @@ class ConformalBlockTableSeed:
                     if "expand" in dir(den_list[l][i]):
                         den_list[l][i] = den_list[l][i].expand()
 
-                    for j in range(0, derivative_order + 1):
+                    for j in range(0, len(res_list[l][i].chunks)):
                         for n in range(0, res_list[l][i].chunks[j].nrows()):
                             element = res_list[l][i].chunks[j].get(n, 0)
                             element = element.expand()
@@ -434,8 +442,6 @@ class ConformalBlockTableSeed:
         a = symbols('a')
         b = symbols('b')
         hack = symbols('hack')
-        r = function_symbol('r', a, b)
-        eta = function_symbol('eta', a, b)
         old_coeff_grid = []
 
         rules1 = []
@@ -465,6 +471,36 @@ class ConformalBlockTableSeed:
                 self.m_order.append(m)
                 self.n_order.append(n)
 
+        # If b is always 0, then eta is always 1
+        if n_max == 0:
+            _x = symbols('_x')
+            r = function_symbol('r', a)
+            g = function_symbol('g', r)
+
+            for m in range(0, derivative_order + 1):
+                if m == 0:
+                    old_expression = g
+                    g = function_symbol('g', _x)
+                else:
+                    old_expression = old_expression.diff(a)
+
+                expression = old_expression
+                for i in range(1, m + 1):
+                    expression = expression.subs(Derivative(r, [a] * i), rules1[i])
+
+                for l in range(0, len(conformal_blocks)):
+                    new_deriv = expression
+                    for i in range(1, m + 1):
+                        new_deriv = new_deriv.subs(Subs(Derivative(g, [_x] * i), [_x], [r]), conformal_blocks[l].chunks[0].get(i, 0))
+                    if m == 0:
+                        new_deriv = conformal_blocks[l].chunks[0].get(0, 0)
+                    self.table[l].vector.append(new_deriv.expand())
+
+            # Prevent further execution
+            n_max = -1
+
+        r = function_symbol('r', a, b)
+        eta = function_symbol('eta', a, b)
         old_coeff_grid[0][0] = 1
         order = 0
 
@@ -600,7 +636,7 @@ class ConformalBlockTable:
     A class which calculates tables of conformal block derivatives when initialized.
     This uses recursion relations on the diagonal found by Hogervorst, Osborn and
     Rychkov in arXiv:1305.1321.
-    
+
     Parameters
     ----------
     dim:       The spatial dimension. If even dimensions are of interest, floating
@@ -793,7 +829,7 @@ class ConvolvedBlockTable:
     after a change to the external dimensions, a `ConvolvedBlockTable` does not
     either. This is because external dimensions only appear symbolically through a
     symbol called `delta_ext`.
-    
+
     Parameters
     ----------
     block_table: A `ConformalBlockTable` from which to produce the convolved blocks.
