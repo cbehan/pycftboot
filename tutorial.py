@@ -2,7 +2,7 @@
 """
 This is a tutorial that applies conformal bootstrap logic with PyCFTBoot to make
 non-trivial statements about four different conformal field theories. These are
-taken from the examples in section 4 of the PyCFTBoot paper. More information can
+taken from the examples in section 4 of arXiv:1602.02810. More information can
 be found by reading the other sections or the documentation strings of PyCFTBoot.
 These can be accessed by running `pydoc -g`.
 """
