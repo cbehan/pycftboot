@@ -700,10 +700,9 @@ class ConformalBlockTable:
         self.table = small_table.table
 
         a = symbols('a')
-        l = symbols('l')
         nu = eval_mpfr(sympy.Rational(dim, 2) - 1, prec)
-        c_2 = (l * (l + 2 * nu) + delta * (delta - 2 * nu - 2)) / 2
-        c_4 = l * (l + 2 * nu) * (delta - 1) * (delta - 2 * nu - 1)
+        c_2 = (ell * (ell + 2 * nu) + delta * (delta - 2 * nu - 2)) / 2
+        c_4 = ell * (ell + 2 * nu) * (delta - 1) * (delta - 2 * nu - 1)
         polys = [0, 0, 0, 0, 0]
         poly_derivs = [[], [], [], [], []]
         delta_prod = delta_12 * delta_34 / (eval_mpfr(-2, prec))
@@ -737,7 +736,7 @@ class ConformalBlockTable:
                 polys[i] = polys[i].diff(a)
 
         for m in range(self.m_order[-1] + 1, m_max + 2 * n_max + 1):
-            for j in range(0, len(small_table.table)):
+            for l in range(0, len(small_table.table)):
                 new_deriv = 0
                 for i in range(m - 1, max(m - 8, -1), -1):
                     coeff = 0
@@ -757,11 +756,11 @@ class ConformalBlockTable:
                         k += 1
 
                     if type(coeff) != type(1):
-                        coeff = coeff.subs(l, small_table.table[j].label[0])
-                    new_deriv -= coeff * self.table[j].vector[i]
+                        coeff = coeff.subs(ell, small_table.table[l].label[0])
+                    new_deriv -= coeff * self.table[l].vector[i]
 
                 new_deriv = new_deriv / poly_derivs[4][0]
-                self.table[j].vector.append(new_deriv.expand())
+                self.table[l].vector.append(new_deriv.expand())
 
             self.m_order.append(m)
             self.n_order.append(0)
@@ -785,27 +784,27 @@ class ConformalBlockTable:
                 coeff8 = (1 - n)
                 coeff9 = (1 - n) * (-6 + 3 * m + 4 * n - 2 * nu + 2 * delta_sum)
 
-                for j in range(0, len(small_table.table)):
+                for l in range(0, len(small_table.table)):
                     new_deriv = 0
 
                     if m > 0:
-                        new_deriv += coeff1 * self.table[j].vector[index_map[n][m - 1]]
+                        new_deriv += coeff1 * self.table[l].vector[index_map[n][m - 1]]
                     if m > 1:
-                        new_deriv += coeff2 * self.table[j].vector[index_map[n][m - 2]]
+                        new_deriv += coeff2 * self.table[l].vector[index_map[n][m - 2]]
                     if m > 2:
-                        new_deriv += coeff3 * self.table[j].vector[index_map[n][m - 3]]
+                        new_deriv += coeff3 * self.table[l].vector[index_map[n][m - 3]]
 
-                    new_deriv += coeff4 * self.table[j].vector[index_map[n - 1][m + 2]]
-                    new_deriv += coeff5 * self.table[j].vector[index_map[n - 1][m + 1]]
-                    new_deriv += coeff6.subs(l, small_table.table[j].label[0]) * self.table[j].vector[index_map[n - 1][m]]
-                    new_deriv += coeff7 * self.table[j].vector[index_map[n - 1][m - 1]]
+                    new_deriv += coeff4 * self.table[l].vector[index_map[n - 1][m + 2]]
+                    new_deriv += coeff5 * self.table[l].vector[index_map[n - 1][m + 1]]
+                    new_deriv += coeff6.subs(ell, small_table.table[l].label[0]) * self.table[l].vector[index_map[n - 1][m]]
+                    new_deriv += coeff7 * self.table[l].vector[index_map[n - 1][m - 1]]
 
                     if n > 1:
-                        new_deriv += coeff8 * self.table[j].vector[index_map[n - 2][m + 2]]
-                        new_deriv += coeff9 * self.table[j].vector[index_map[n - 2][m + 1]]
+                        new_deriv += coeff8 * self.table[l].vector[index_map[n - 2][m + 2]]
+                        new_deriv += coeff9 * self.table[l].vector[index_map[n - 2][m + 1]]
 
                     new_deriv = new_deriv / (2 - 4 * n - 4 * nu)
-                    self.table[j].vector.append(new_deriv.expand())
+                    self.table[l].vector.append(new_deriv.expand())
 
                 self.m_order.append(m)
                 self.n_order.append(n)
