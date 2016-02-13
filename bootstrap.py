@@ -25,6 +25,10 @@ from symengine import *
 from symengine.lib.symengine_wrapper import *
 import sympy
 
+if have_mpfr == False:
+    print("Symengine must be compiled with MPFR support")
+    quit(1)
+
 cutoff = 0
 prec = 660
 mpmath.mp.dps = int((3.0 / 10.0) * prec)
