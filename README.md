@@ -14,11 +14,10 @@ If you use one of the mainstream Linux distributions, the following instructions
 3. There are two dependencies left. One is [Symengine](https://github.com/symengine/symengine) which probably needs to be compiled. One commit that has been tested is 5427bbe. An even better idea is to use the latest commit that has been [marked stable](https://github.com/symengine/symengine.py/blob/master/symengine_version.txt) for language bindings. To compile it with the recommended settings, run:
 
         mkdir -p build && cd build
+        # Last flag is especially important
         cmake .. -DWITH_TCMALLOC:BOOL=ON -DWITH_PTHREAD:BOOL=ON -DWITH_SYMENGINE_THREAD_SAFE:BOOL=ON -DWITH_MPFR:BOOL=ON
         make
         
-The last one is especially important.
-
 4. Lastly, compile and install [Symengine.py](https://github.com/symengine/symengine.py).
 
 5. It is possible that PyCFTBoot works now. To be sure, there are potentially three useful changes to the code in `bootstrap.py`. If the Python binary you use is called something else, change `python2` in the first line to `python` or whatever it is. If the sympy package you installed does not have mpmath as a separate module, change `import mpmath` to `import sympy.mpmath as mpmath`. Finally, change `/usr/bin/sdpb` to a different path if your SDPB is not in the system-wide directory.
