@@ -229,8 +229,8 @@ if choice == 4:
     f_tab3 = bootstrap.ConvolvedBlockTable(g_tab, content = combo2)
     tab_list = [f_tab1a, f_tab1s, f_tab2a, f_tab2s, f_tab3]
     # Sets up a vectorial sum rule just like in example 2.
-    vec1 = [[1, 3], [1, 2], [1, 4]]
-    vec2 = [[-1, 3], [1, 2], [1, 4]]
+    vec1 = [[1, 4], [1, 2], [1, 3]]
+    vec2 = [[-1, 4], [1, 2], [1, 3]]
     vec3 = [[0, 0], [1, 0], [-1, 1]]
     info = [[vec1, 0, "singlet"], [vec2, 1, "antisymmetric"], [vec3, 0, "symmetric"]]
     # Allocates an SDP and makes it easier for a problem to be recognized as dual feasible.
@@ -239,7 +239,7 @@ if choice == 4:
     # Goes through all the spins and tells the symmetric channel to contain a BPS operator and then a gap.
     for l in range(0, l_max + 1, 2):
         sdp.add_point([l, "symmetric"], 2 * dim_phi + l)
-        sdp.add_bound([l, "symmetric"], abs(2 * dim_phi - 3) + 3 + l)
+        sdp.set_bound([l, "symmetric"], abs(2 * dim_phi - 3) + 3 + l)
     # Does a long test.
     result = sdp.bisect(3.0, 4.25, 0.01, [0, "singlet"])
     cprint("If crossing symmetry and unitarity hold, the maximum gap we can have for singlet scalars is: " + str(result))
