@@ -138,6 +138,8 @@ def convolved_table_list(tab1, tab2, tab3):
 if choice == 3:
     cprint("Generating the tables needed to test two points...")
     dim = 3
+    # Poles would be too approximate otherwise.
+    bootstrap.cutoff = 0
     # First odd scalar, first even scalar.
     pair1 = [0.518, 1.412]
     pair2 = [0.53, 1.412]
@@ -156,16 +158,16 @@ if choice == 3:
         # A somewhat descriptive name.
         tab.dump("tab_" + str(tab.delta_12) + "_" + str(tab.delta_34))
         del tab
-    # Third vector: 0, 0, 1 * table4 with one of each dimension, 1 * table2 with only pair[0] dimensions, -1 * table3 with only pair[0] dimensions
+    # Third vector: 0, 0, 1 * table4 with one of each dimension, -1 * table2 with only pair[0] dimensions, 1 * table3 with only pair[0] dimensions
     vec3 = [[0, 0, 0, 0], [0, 0, 0, 0], [1, 4, 1, 0], [-1, 2, 0, 0], [1, 3, 0, 0]]
-    # Second vector: 0, 0, 1 * table4 with one of each dimension, -1 * table2 with only pair[0] dimensions, 1 * table3 with only pair[0] dimensions
-    vec2 = [[0, 0, 0, 0], [0, 0, 0, 0], [1, 4, 1, 0], [-1, 2, 0, 0], [1, 3, 0, 0]]
+    # Second vector: 0, 0, 1 * table4 with one of each dimension, 1 * table2 with only pair[0] dimensions, -1 * table3 with only pair[0] dimensions
+    vec2 = [[0, 0, 0, 0], [0, 0, 0, 0], [1, 4, 1, 0], [1, 2, 0, 0], [-1, 3, 0, 0]]
     # The first vector has five components as well but they are matrices of quads, not just the quads themselves.
     m1 = [[[1, 0, 0, 0], [0, 0, 0, 0]], [[0, 0, 0, 0], [0, 0, 0, 0]]]
     m2 = [[[0, 0, 0, 0], [0, 0, 0, 0]], [[0, 0, 0, 0], [1, 0, 1, 1]]]
     m3 = [[[0, 0, 0, 0], [0, 0, 0, 0]], [[0, 0, 0, 0], [0, 0, 0, 0]]]
     m4 = [[[0, 0, 0, 0], [0.5, 0, 0, 1]], [[0.5, 0, 0, 1], [0, 0, 0, 0]]]
-    m5 = [[[0, 0, 0, 0], [0.5, 1, 0, 1]], [[0.5, 1, 0, 1], [0, 0, 0, 0]]]
+    m5 = [[[0, 1, 0, 0], [0.5, 1, 0, 1]], [[0.5, 1, 0, 1], [0, 1, 0, 0]]]
     vec1 = [m1, m2, m3, m4, m5]
     # Spins for these again go even, even, odd.
     info = [[vec1, 0, "z2-even-l-even"], [vec2, 0, "z2-odd-l-even"], [vec3, 1, "z2-odd-l-odd"]]
