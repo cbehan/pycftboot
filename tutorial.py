@@ -204,19 +204,19 @@ if choice == 4:
     dim_phi = 1.4
     cprint("Finding a bound on the singlets...")
     # Generates a fairly demanding table in 3.99 dimensions.
-    k_max = 30
+    k_max = 25
     l_max = 26
-    m_max = 4
-    n_max = 6
+    m_max = 3
+    n_max = 5
     g_tab = bootstrap.ConformalBlockTable(3.99, k_max, l_max, m_max, n_max, odd_spins = True)
     # Bring reserved symbols into our namespace to avoid typing "bootstrap" in what follows.
     delta = bootstrap.delta
     ell = bootstrap.ell
     # Four coefficients that show up in the 4D N = 1 expression for superconformal blocks.
-    c1 = (delta + ell + 1) * (delta - ell - 1)
-    c2 = -(delta + ell) * (delta - ell - 1) / 4
-    c3 = -(delta - ell - 2) * (delta + ell + 1) / 4
-    c4 = (delta + ell) * (delta - ell - 2) / 16
+    c1 = (delta + ell + 1) * (delta - ell - 1) * (ell + 1)
+    c2 = -(delta + ell) * (delta - ell - 1) * (ell + 2)
+    c3 = -(delta - ell - 2) * (delta + ell + 1) * ell
+    c4 = (delta + ell) * (delta - ell - 2) * (ell + 1)
     # We have c1 beside (delta + 0, ell + 0), c2 beside (delta + 1, ell + 1), c3 beside (delta + 1, ell - 1) and c4 beside (delta + 2, ell).
     combo1 = [[c1, 0, 0], [c2, 1, 1], [c3, 1, -1], [c4, 2, 0]]
     # The second linear combination has signs flipped on the parts with odd spin shift.

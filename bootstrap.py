@@ -965,6 +965,7 @@ class ConvolvedBlockTable:
                     del_shift = trip[1]
                     ell_shift = trip[2] // step
 
+                    coeff *= r_cross ** del_shift
                     if l + ell_shift >= 0:
                         for p in all_poles:
                             new = True
