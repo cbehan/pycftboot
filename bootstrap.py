@@ -21,7 +21,6 @@ import os
 
 # Use regular sympy sparingly because it is slow
 # Every time we explicitly use it, we should consider implementing such a line in C++
-from symengine import *
 from symengine.lib.symengine_wrapper import *
 import sympy
 
@@ -36,10 +35,10 @@ mpmath.mp.dps = int((3.0 / 10.0) * prec)
 rho_cross = 3 - 2 * mpmath.sqrt(2)
 r_cross = eval_mpfr(3 - 2 * sqrt(2), prec)
 
-ell = symbols('ell')
-delta  = symbols('delta')
-delta_ext = symbols('delta_ext')
-aux = symbols('aux')
+ell = Symbol('ell')
+delta  = Symbol('delta')
+delta_ext = Symbol('delta_ext')
+aux = Symbol('aux')
 
 def dump_table_contents(block_table, name):
     dump_file = open(name, 'w')
@@ -106,8 +105,8 @@ class LeadingBlockVector:
         self.n_max = n_max
         self.chunks = []
 
-        r = symbols('r')
-        eta = symbols('eta')
+        r = Symbol('r')
+        eta = Symbol('eta')
         nu = sympy.Rational(dim, 2) - 1
         derivative_order = m_max + 2 * n_max
 
@@ -443,9 +442,9 @@ class ConformalBlockTableSeed:
             conformal_blocks.append(conformal_block)
             self.table.append(PolynomialVector([], [l, 0], conformal_block.large_poles))
 
-        a = symbols('a')
-        b = symbols('b')
-        hack = symbols('hack')
+        a = Symbol('a')
+        b = Symbol('b')
+        hack = Symbol('hack')
         old_coeff_grid = []
 
         rules1 = []
@@ -477,7 +476,7 @@ class ConformalBlockTableSeed:
 
         # If b is always 0, then eta is always 1
         if n_max == 0:
-            _x = symbols('_x')
+            _x = Symbol('_x')
             r = function_symbol('r', a)
             g = function_symbol('g', r)
 
@@ -703,7 +702,7 @@ class ConformalBlockTable:
         self.n_order = small_table.n_order
         self.table = small_table.table
 
-        a = symbols('a')
+        a = Symbol('a')
         nu = eval_mpfr(sympy.Rational(dim, 2) - 1, prec)
         c_2 = (ell * (ell + 2 * nu) + delta * (delta - 2 * nu - 2)) / 2
         c_4 = ell * (ell + 2 * nu) * (delta - 1) * (delta - 2 * nu - 1)
@@ -909,7 +908,7 @@ class ConvolvedBlockTable:
         for n in range(0, block_table.n_max + 1):
             symbol_list = []
             for m in range(0, 2 * (block_table.n_max - n) + block_table.m_max + 1):
-                symbol_list.append(symbols('g_' + n.__str__() + '_' + m.__str__()))
+                symbol_list.append(Symbol('g_' + n.__str__() + '_' + m.__str__()))
             symbol_array.append(symbol_list)
 
         derivatives = []
