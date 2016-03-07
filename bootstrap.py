@@ -67,7 +67,7 @@ def dump_table_contents(block_table, name):
 
 def unitarity_bound(dim, spin):
     if spin == 0:
-        return sympy.Rational(dim, 2) - 1
+        return (Integer(dim) / Integer(2)) - 1
     else:
         return dim + spin - 2
 
@@ -79,21 +79,18 @@ def omit_all(poles, special_poles, var):
     return expression
 
 def delta_pole(nu, k, l, series):
-    if nu % 1 == 0:
-        nu = int(nu)
-
     if series == 1:
         pole = 1 - l - k
     elif series == 2:
         pole = 1 + nu - k
-        if nu % 1 == 0:
+        if type(nu) == type(Integer(1)):
             pole += aux
     else:
         pole = 1 + l + 2 * nu - k
-        if nu % 1 == 0:
+        if type(nu) == type(Integer(1)):
             pole += 2 * aux
 
-    if nu % 1 == 0:
+    if type(nu) == type(Integer(1)):
         return pole
     else:
         return eval_mpfr(pole, prec)
@@ -107,7 +104,7 @@ class LeadingBlockVector:
 
         r = Symbol('r')
         eta = Symbol('eta')
-        nu = sympy.Rational(dim, 2) - 1
+        nu = (Integer(dim) / Integer(2)) - 1
         derivative_order = m_max + 2 * n_max
 
         # With only a derivatives, we never need eta derivatives
@@ -168,7 +165,7 @@ class ConformalBlockVector:
         self.small_poles = []
         self.chunks = []
 
-        nu = sympy.Rational(dim, 2) - 1
+        nu = (Integer(dim) / Integer(2)) - 1
         old_list = MeromorphicBlockVector(leading_block)
         for k in range(0, len(pol_list)):
             pole = delta_pole(nu, pol_list[k][1], l, pol_list[k][3])
@@ -277,7 +274,7 @@ class ConformalBlockTableSeed:
             return
 
         derivative_order = m_max + 2 * n_max
-        nu = sympy.Rational(dim, 2) - 1
+        nu = (Integer(dim) / Integer(2)) - 1
 
         # The matrix for how derivatives are affected when one multiplies by r
         r_powers = []
@@ -595,8 +592,7 @@ class ConformalBlockTableSeed:
         # Time saving special case
         if series != 2 and k % 2 != 0 and delta_12 == 0 and delta_34 == 0:
             return 0
-        elif nu % 1 == 0:
-            nu = int(nu)
+        elif type(nu) == type(Integer(1)):
             zero = aux
 
         if series == 1:
@@ -615,17 +611,17 @@ class ConformalBlockTableSeed:
             else:
                 ret *= (l + nu - k) / (l + nu + k)
 
-            if k >= l + nu and (l + nu - k) % 2 == 0:
+            if k >= l + nu and type((l + nu - k) / 2) == type(Integer(1)):
                 ret *= -4 * sympy.rf(-nu, nu) * factorial(k - nu) / (zero * (sympy.rf((l + nu - k + 1) / 2, k) * sympy.rf((l + nu - k) / 2, (k - l - nu) / 2) * factorial(((l + nu - k) / 2) + (k - 1))) ** 2)
-            elif k >= l + nu + 1 and (l + nu + 1 - k) % 2 == 0:
+            elif k >= l + nu + 1 and type((l + nu + 1 - k) / 2) == type(Integer(1)):
                 ret *= -4 * sympy.rf(-nu, nu) * factorial(k - nu) / (zero * (sympy.rf((l + nu - k) / 2, k) * sympy.rf((l + nu - k + 1) / 2, (k - 1 - l - nu) / 2) * factorial(((l + nu - k + 1) / 2) + (k - 1))) ** 2)
-            elif k >= nu and nu % 1 == 0:
+            elif k >= nu and type(nu) == type(Integer(1)):
                 ret *= -sympy.rf(-nu, nu) * factorial(k - nu) * zero / ((sympy.rf((l + nu - k + 1) / 2, k) * sympy.rf((l + nu - k) / 2, k)) ** 2)
             else:
                 ret *= sympy.rf(-nu, k + 1) / ((sympy.rf((l + nu - k + 1) / 2, k) * sympy.rf((l + nu - k) / 2, k)) ** 2)
 
             for f in factors:
-                if -k < f <= k and (f - k) % 2 == 0:
+                if -k < f <= k and type((f - k) / 2) == type(Integer(1)):
                     ret *= sympy.rf((f - k) / 2, (k - f) / 2) * factorial(((f + k) / 2) - 1) * zero / 2
                 else:
                     ret *= sympy.rf((f - k) / 2, k)
@@ -703,7 +699,7 @@ class ConformalBlockTable:
         self.table = small_table.table
 
         a = Symbol('a')
-        nu = eval_mpfr(sympy.Rational(dim, 2) - 1, prec)
+        nu = eval_mpfr((Integer(dim) / Integer(2)) - 1, prec)
         c_2 = (ell * (ell + 2 * nu) + delta * (delta - 2 * nu - 2)) / 2
         c_4 = ell * (ell + 2 * nu) * (delta - 1) * (delta - 2 * nu - 1)
         polys = [0, 0, 0, 0, 0]
@@ -922,7 +918,7 @@ class ConvolvedBlockTable:
                 self.n_order.append(n)
 
                 expression = 0
-                old_coeff = eval_mpfr(sympy.Rational(1, 4), prec) ** delta_ext
+                old_coeff = eval_mpfr(Integer(1) / Integer(4), prec) ** delta_ext
                 for j in range(0, n + 1):
                     coeff = old_coeff
                     for i in range(0, m + 1):
