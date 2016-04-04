@@ -30,7 +30,9 @@ if have_mpfr == False:
 
 cutoff = 0
 prec = 660
-mpmath.mp.dps = int((3.0 / 10.0) * prec)
+dec_prec = int((3.0 / 10.0) * prec)
+mpmath.mp.dps = dec_prec
+exec("tiny = eval_mpfr(1e-" + str(dec_prec - 10) + ", prec)")
 
 rho_cross = 3 - 2 * mpmath.sqrt(2)
 r_cross = eval_mpfr(3 - 2 * sqrt(2), prec)
@@ -1379,6 +1381,20 @@ class SDP:
         ret = [const] + ret[:max_index] + ret[max_index + 1:]
         return ret
 
+    def short_string(self, num):
+        """
+        Returns the string representation of a number except with an attempt to trim
+        superfluous zeros if the number is too small.
+
+        Parameters
+        ----------
+        num: The number.
+        """
+        if num < tiny:
+            return "0"
+        else:
+            return str(num)
+
     def get_index(self, array, element):
         """
         Finds where an element occurs in an array or -1 if not present.
@@ -1555,7 +1571,7 @@ class SDP:
         # Here, we use indices that match the SDPB specification
         for n in range(0, len(obj)):
             elt_node = doc.createElement("elt")
-            elt_node.appendChild(doc.createTextNode(obj[n].__str__()))
+            elt_node.appendChild(doc.createTextNode(self.short_string(obj[n])))
             objective_node.appendChild(elt_node)
 
         for j in range(0, len(self.table)):
@@ -1603,7 +1619,7 @@ class SDP:
                                 coeff = eval_mpfr(coeff_list[d].args[0], prec)
                     
                             coeff_node = doc.createElement("coeff")
-                            coeff_node.appendChild(doc.createTextNode(coeff.__str__()))
+                            coeff_node.appendChild(doc.createTextNode(self.short_string(coeff)))
                             polynomial_node.appendChild(coeff_node)
                         vector_node.appendChild(polynomial_node)
                     elements_node.appendChild(vector_node)
