@@ -216,7 +216,7 @@ class ConformalBlockVector:
                         self.chunks[j] = self.chunks[j].add_matrix(res_list[k].chunks[j].mul_scalar(vector.get(i, 0) * omit_all(self.large_poles, [self.large_poles[i]], delta)))
 
         for j in range(0, len(self.chunks)):
-            s_sub = s_matrix.submatrix(0, derivative_order - j, 0, derivative_order - j)
+            s_sub = s_matrix.[0:derivative_order - j + 1, 0:derivative_order - j + 1]
             self.chunks[j] = s_sub.mul_matrix(self.chunks[j])
 
 class PolynomialVector:
@@ -500,7 +500,7 @@ class ConformalBlockTableSeed:
                     pow_list[l][i] += pol_list[l][i][0]
 
                     for j in range(0, len(res_list[l][i].chunks)):
-                        r_sub = r_powers[pol_list[l][i][0]].submatrix(0, derivative_order - j, 0, derivative_order - j)
+                        r_sub = r_powers[pol_list[l][i][0]][0:derivative_order - j + 1, 0:derivative_order - j + 1]
                         res_list[l][i].chunks[j] = r_sub.mul_matrix(res_list[l][i].chunks[j]).mul_scalar(res)
 
             for l in range(0, l_max + k_max + 1):
