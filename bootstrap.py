@@ -1535,7 +1535,7 @@ class SDP:
         ----------
         num: The number.
         """
-        if num < tiny:
+        if abs(num) < tiny:
             return "0"
         else:
             return str(num)
