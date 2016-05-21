@@ -216,7 +216,7 @@ class ConformalBlockVector:
                         self.chunks[j] = self.chunks[j].add_matrix(res_list[k].chunks[j].mul_scalar(vector.get(i, 0) * omit_all(self.large_poles, [self.large_poles[i]], delta)))
 
         for j in range(0, len(self.chunks)):
-            s_sub = s_matrix.[0:derivative_order - j + 1, 0:derivative_order - j + 1]
+            s_sub = s_matrix[0:derivative_order - j + 1, 0:derivative_order - j + 1]
             self.chunks[j] = s_sub.mul_matrix(self.chunks[j])
 
 class PolynomialVector:
