@@ -1483,8 +1483,8 @@ class SDP:
                     if type(expression) == type(eval_mpfr(1, 10)):
                         coeff_list = [expression]
                     else:
-                        coeff_list = expression.args
-                    degree = max(degree, len(coeff_list) - 1)
+                        coeff_list = sorted(expression.args, key = self.extract_power)
+                    degree = max(degree, self.extract_power(coeff_list[-1]))
 
         for d in range(0, 2 * (degree // 2) + 1):
             result = self.integral(d, delta_min, poles)
@@ -1755,7 +1755,7 @@ class SDP:
                             coeff_list = [expression]
                         else:
                             coeff_list = sorted(expression.args, key = self.extract_power)
-                        degree = max(degree, len(coeff_list) - 1)
+                        degree = max(degree, self.extract_power(coeff_list[-1]))
                         if coeff_list == []:
                             coeff_list = [0.0]
 
