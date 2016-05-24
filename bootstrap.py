@@ -69,7 +69,7 @@ def dump_table_contents(block_table, name):
 
 def unitarity_bound(dim, spin):
     if spin == 0:
-        return (Integer(dim) / Integer(2)) - 1
+        return (dim / Integer(2)) - 1
     else:
         return dim + spin - 2
 
@@ -106,7 +106,7 @@ class LeadingBlockVector:
 
         r = Symbol('r')
         eta = Symbol('eta')
-        nu = (Integer(dim) / Integer(2)) - 1
+        nu = (dim / Integer(2)) - 1
         derivative_order = m_max + 2 * n_max
 
         # With only a derivatives, we never need eta derivatives
@@ -167,7 +167,7 @@ class ConformalBlockVector:
         self.small_poles = []
         self.chunks = []
 
-        nu = (Integer(dim) / Integer(2)) - 1
+        nu = (dim / Integer(2)) - 1
         old_list = MeromorphicBlockVector(leading_block)
         for k in range(0, len(pol_list)):
             pole = delta_pole(nu, pol_list[k][1], l, pol_list[k][3])
@@ -269,7 +269,7 @@ class ConformalBlockTableSeed2:
 
         pole_set = []
         conformal_blocks = []
-        nu = eval_mpfr((Integer(dim) / Integer(2)) - 1, prec)
+        nu = eval_mpfr((dim / Integer(2)) - 1, prec)
         delta_prod = delta_12 * delta_34 / (eval_mpfr(-2, prec))
         delta_sum = (delta_12 - delta_34) / (eval_mpfr(-2, prec))
 
@@ -424,7 +424,7 @@ class ConformalBlockTableSeed:
             return
 
         derivative_order = m_max + 2 * n_max
-        nu = (Integer(dim) / Integer(2)) - 1
+        nu = (dim / Integer(2)) - 1
 
         # The matrix for how derivatives are affected when one multiplies by r
         r_powers = []
@@ -849,7 +849,7 @@ class ConformalBlockTable:
         self.table = small_table.table
 
         a = Symbol('a')
-        nu = eval_mpfr((Integer(dim) / Integer(2)) - 1, prec)
+        nu = eval_mpfr((dim / Integer(2)) - 1, prec)
         c_2 = (ell * (ell + 2 * nu) + delta * (delta - 2 * nu - 2)) / 2
         c_4 = ell * (ell + 2 * nu) * (delta - 1) * (delta - 2 * nu - 1)
         polys = [0, 0, 0, 0, 0]
