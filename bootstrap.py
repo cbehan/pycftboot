@@ -32,7 +32,7 @@ cutoff = 0
 prec = 660
 dec_prec = int((3.0 / 10.0) * prec)
 mpmath.mp.dps = dec_prec
-exec("tiny = eval_mpfr(1e-" + str(dec_prec - 10) + ", prec)")
+exec("tiny = eval_mpfr(1e-" + str(dec_prec // 2) + ", prec)")
 
 rho_cross = 3 - 2 * mpmath.sqrt(2)
 r_cross = eval_mpfr(3 - 2 * sqrt(2), prec)
@@ -242,7 +242,64 @@ class PolynomialVector:
         self.label = spin_irrep
         self.poles = poles
 
+    def extract_power(self, term):
+        """
+        Returns the degree of a single term in a polynomial. Symengine stores these
+        as (coefficient, (delta, exponent)). This is helpful for sorting polynomials
+        which are not sorted by default.
+
+        Parameters
+        ----------
+        term: The symengine formula for a momomial.
+        """
+        if not "args" in dir(term):
+            return 0
+
+        if term.args == ():
+            return 0
+        elif term.args[1].args == ():
+            return 1
+        else:
+            return term.args[1].args[1]
+
+    def coefficients(self, polynomial):
+        """
+        Returns a sorted list of all coefficients in a polynomial starting with the
+        constant term. Zeros are automatically added so that the length of the list
+        is always one more than the degree.
+
+        Parameters
+        ----------
+        polynomial: The symengine formula for a polynomial.
+        """
+        if not "args" in dir(polynomial):
+            return [polynomial]
+
+        coeff_list = sorted(polynomial.args, key = self.extract_power)
+        degree = self.extract_power(coeff_list[-1])
+
+        pos = 0
+        ret = []
+        for d in range(0, degree + 1):
+            if self.extract_power(coeff_list[pos]) == d:
+                if d == 0:
+                    ret.append(eval_mpfr(coeff_list[0], prec))
+                else:
+                    ret.append(eval_mpfr(coeff_list[pos].args[0], prec))
+                pos += 1
+            else:
+                ret.append(0)
+        return ret
+
 class ConformalBlockTableSeed2:
+    """
+    A class which calculates tables of conformal block derivatives from scratch
+    using a power series solution of their fourth order differential equation.
+    Usually, it will not be necessary for the user to call it. Instead,
+    `ConformalBlockTable` calls it automatically for `m_max = 3` and `n_max = 0`.
+    People calling it manually may change the value of `m_max` but `n_max` cannot
+    be handled with this method and it is therefore ignored.
+    """
     def __init__(self, dim, k_max, l_max, m_max, n_max, delta_12 = 0, delta_34 = 0, odd_spins = False, name = None):
         self.dim = dim
         self.k_max = k_max
@@ -276,7 +333,7 @@ class ConformalBlockTableSeed2:
         for l in range(0, l_max + 1, step):
             poles = []
             for k in range(1, k_max + 1):
-                poles.append(1 - k - l)
+                poles.append(eval_mpfr(1 - k - l, prec))
                 poles.append((2 + 2 * nu - k) / eval_mpfr(2, prec))
                 poles.append(1 - k + l + 2 * nu)
             pole_set.append(poles)
@@ -307,17 +364,17 @@ class ConformalBlockTableSeed2:
                 recursion_coeffs[2] += (k ** 3) * 4 * (3 * delta - nu - 10 - 8 * delta_sum)
                 recursion_coeffs[2] += (k ** 2) * (3 * delta * (5 * delta - 2 * nu - 38) - 2 * nu * (2 * nu + 3 * l - 17) - 3 * l * l + 209 - 16 * delta_prod - 16 * delta_sum * (5 * delta_sum + 6 * delta - 18))
                 recursion_coeffs[2] += (k ** 1) * 2 * (3 * delta * delta * delta + delta * delta * (nu - 44) - 3 * delta * (2 * nu * (nu + l - 2) + l * l - 63) + nu * (2 * l * nu + 18 * nu + l * l + 20 * l - 51) + 10 * l * l - 252 + 32 * delta_sum * (delta_prod + 2 * delta_sum * delta_sum) + 8 * (delta_sum * delta_sum - delta_prod) * (31 + 8 * nu - 10 * delta) - 8 * delta_sum * (5 * delta * delta + 2 * delta * (nu - 17) - 2 * nu * (2 * nu + l) - l * l + 57))
-                recursion_coeffs[2] += (k ** 0) * (2 * delta * delta * delta * (2 * nu - 7) + delta * delta * (133 - 14 * nu - 8 * nu) - 2 * delta * (2 * nu * nu * (2 * l - 11) + nu * (2 * l * l - 3) - 7 * l * l + 216) + nu * (4 * l * nu - 72 * nu + 2 * l * l - 66 * l + 108) - 33 * l * l + 468 + 64 * delta_sum * (2 * delta_sum * delta_sum - 3 * delta_prod) * (delta - 3) + 16 * (delta_sum * delta_sum - delta_prod) * (8 * delta_prod + delta * (29 + 6 * nu - 4 * delta) + 2 * nu * (l - 12) + l * l - 48) + 16 * delta_sum * (delta - 3) * (l * l - (delta - 3) * (delta - 7) - 2 * nu * (delta - l) + 4 * nu * nu) + 16 * delta_prod * delta_sum * (16 * delta - 10 * nu - 41) + 8 * delta_prod * (delta * (73 + 10 * nu - 10 * delta) + 2 * nu * (4 * nu + 2 * l - 27) + 2 * l * l - 123))
+                recursion_coeffs[2] += (k ** 0) * (2 * delta * delta * delta * (2 * nu - 7) + delta * delta * (133 - 14 * nu - 8 * nu) - 2 * delta * (2 * nu * nu * (2 * l - 11) + nu * (2 * l * l - 14 * l + 11) - 7 * l * l + 216) + nu * (4 * l * nu - 72 * nu + 2 * l * l - 66 * l + 108) - 33 * l * l + 468 + 64 * delta_sum * (2 * delta_sum * delta_sum - 3 * delta_prod) * (delta - 3) + 16 * (delta_sum * delta_sum - delta_prod) * (8 * delta_prod + delta * (29 + 6 * nu - 4 * delta) + 2 * nu * (l - 12) + l * l - 48) + 16 * delta_sum * (delta - 3) * (l * l - (delta - 3) * (delta - 7) - 2 * nu * (delta - l) + 4 * nu * nu) + 16 * delta_prod * delta_sum * (16 * delta - 10 * nu - 41) + 8 * delta_prod * (delta * (73 + 10 * nu - 10 * delta) + 2 * nu * (4 * nu + 2 * l - 27) + 2 * l * l - 123))
                 recursion_coeffs[3] += (k ** 4) * (-3)
                 recursion_coeffs[3] += (k ** 3) * 4 * (11 - nu - 3 * delta - 8 * delta_sum)
                 recursion_coeffs[3] += (k ** 2) * (-15 * delta * delta - 18 * delta * (nu - 7) + nu * (4 * nu + 6 * l + 50) + 3 * l * l - 251 + delta_sum * (80 * delta_sum + 96 * (4 - delta)) + 16 * delta_prod)
-                recursion_coeffs[3] += (k ** 1) * (-3 * delta * delta * delta + (49 - 11 * nu) * delta * delta + (3 * l * l + 2 * nu * (nu + 3 * l + 35) - 229) * delta + nu * (2 * l * nu - 10 * nu + l * l - 22 * l - 107) - 11 * l * l + 329 + 64 * delta_sum * delta_sum * delta_sum + 4 * delta_prod * (24 * delta + 14 * nu - 91 - 56 * delta_sum) + 8 * delta_sum * (delta * (46 - 5 * delta - 2 * nu) + 2 * nu * (2 * nu + l) + l * l - 99) + 8 * (delta_sum * delta_sum - delta_prod) * (10 * delta + 8 * nu - 39))
-                recursion_coeffs[3] += (k ** 0) * (-4) * (2 * delta * delta * delta * (nu - 2) + delta * delta * (41 - 20 * nu) + delta * (nu * (35 - l * l + 4 * l - 2 * l * nu) + 4 * l * l - 143) + 2 * (nu * (4 * l * nu - 2 * nu + 2 * l * l - 10 * l - 39) - 5 * l * l + 83) + 2 * delta_prod * (16 * delta_sum * delta_sum + delta * (87 - 18 * nu - 10 * delta) + 4 * nu * (2 * nu + l + 11) + 2 * l * l - 172) + 16 * (4 - delta) * delta_sum * (2 * delta_sum * delta_sum - 3 * delta_prod) + 4 * (delta_sum * delta_sum - delta_prod) * (delta * (37 - 10 * nu - 4 * delta) + 2 * nu * (l + 16) + l * l - 76) + 4 * delta_prod * delta_sum * (16 * delta + 10 * nu - 71) - 4 * delta_sum * (4 - delta) * (delta * (delta + 2 * nu - 14) - 2 * nu * (2 * nu + l) - l * l + 35))
+                recursion_coeffs[3] += (k ** 1) * 2 * (-3 * delta * delta * delta + (49 - 11 * nu) * delta * delta + (3 * l * l + 2 * nu * (nu + 3 * l + 35) - 229) * delta + nu * (2 * l * nu - 10 * nu + l * l - 22 * l - 107) - 11 * l * l + 329 + 64 * delta_sum * delta_sum * delta_sum + 4 * delta_prod * (24 * delta + 14 * nu - 91 - 56 * delta_sum) + 8 * delta_sum * (delta * (46 - 5 * delta - 2 * nu) + 2 * nu * (2 * nu + l) + l * l - 99) + 8 * (delta_sum * delta_sum - delta_prod) * (10 * delta + 8 * nu - 39))
+                recursion_coeffs[3] += (k ** 0) * (-4) * (2 * delta * delta * delta * (nu - 2) + delta * delta * (41 - 20 * nu) + delta * (2 * nu * (35 - l * l + 4 * l - 2 * l * nu) + 4 * l * l - 143) + 2 * (nu * (4 * l * nu - 2 * nu + 2 * l * l - 10 * l - 39) - 5 * l * l + 83) + 2 * delta_prod * (16 * delta_sum * delta_sum + delta * (87 - 18 * nu - 10 * delta) + 4 * nu * (2 * nu + l + 11) + 2 * l * l - 172) + 16 * (4 - delta) * delta_sum * (2 * delta_sum * delta_sum - 3 * delta_prod) + 4 * (delta_sum * delta_sum - delta_prod) * (delta * (37 - 10 * nu - 4 * delta) + 2 * nu * (l + 16) + l * l - 76) + 4 * delta_prod * delta_sum * (16 * delta + 10 * nu - 71) - 4 * delta_sum * (4 - delta) * (delta * (delta + 2 * nu - 14) - 2 * nu * (2 * nu + l) - l * l + 35))
                 recursion_coeffs[4] += (k ** 4) * (-3)
                 recursion_coeffs[4] += (k ** 3) * 4 * (14 - nu - 3 * delta + 4 * delta_sum)
                 recursion_coeffs[4] += (k ** 2) * (-15 * delta * delta - 18 * delta * (nu - 9) + 2 * nu * (2 * nu + 3 * l + 31) + 3 * l * l - 401 + 80 * delta_sum * delta_sum + 24 * delta_sum * (2 * delta + 2 * nu - 9) + 8 * delta_prod)
                 recursion_coeffs[4] += (k ** 1) * (-2) * (delta * delta * (3 * delta + 11 * nu - 64) - delta * (2 * nu * (nu + 3 * l + 44) + 3 * l * l - 373) + nu * (14 * nu - 2 * l * nu - l * l + 28 * l + 163) + 14 * l * l - 652 + 32 * delta_prod * delta_sum + 8 * (delta_sum * delta_sum - delta_prod) * (49 - 8 * nu - 10 * delta) + 4 * delta_sum * (delta * (52 - 14 * nu - 5 * delta) - 2 * nu * (2 * nu - 28 - l) + l * l - 121) + 2 * delta_prod * (221 - 42 * nu - 44 * delta))
-                recursion_coeffs[4] += (k ** 0) * (2 * delta * delta * delta * (11 - 4 * nu) + delta * delta * (102 * nu - 227) + 2 * delta * (nu * (8 * l * nu - 2 * nu + 4 * l * l - 22 * l - 219) - 11 * l * l + 584) + 2 * nu * (20 * nu - 18 * l * nu - 9 * l * l + 65 * l + 290) + 65 * l * l - 1620 - 16 * (delta_sum * delta_sum - delta_prod) * (delta * (47 - 10 * nu - 4 * delta) + 2 * nu * (20 + l) + l * l - 120) + 4 * delta_sum * (2 * delta + 2 * nu - 9) * (delta * (delta + 6 * nu - 16) - 2 * nu * (l + 10) - l * l + 40) - 16 * delta_prod * delta_sum * (4 * delta + 6 * nu - 21) + 4 * delta_prod * (delta * (18 * delta + 50 * nu - 213) + 4 * nu * (3 * nu - 2 * l - 55) - 4 * l * l + 555))
+                recursion_coeffs[4] += (k ** 0) * (2 * delta * delta * delta * (11 - 4 * nu) + delta * delta * (102 * nu - 277) + 2 * delta * (nu * (8 * l * nu - 2 * nu + 4 * l * l - 22 * l - 219) - 11 * l * l + 584) + 2 * nu * (20 * nu - 18 * l * nu - 9 * l * l + 65 * l + 290) + 65 * l * l - 1620 - 16 * (delta_sum * delta_sum - delta_prod) * (delta * (47 - 10 * nu - 4 * delta) + 2 * nu * (20 + l) + l * l - 120) + 4 * delta_sum * (2 * delta + 2 * nu - 9) * (delta * (delta + 6 * nu - 16) - 2 * nu * (l + 10) - l * l + 40) - 16 * delta_prod * delta_sum * (4 * delta + 6 * nu - 21) + 4 * delta_prod * (delta * (18 * delta + 50 * nu - 213) + 4 * nu * (3 * nu - 2 * l - 55) - 4 * l * l + 555))
                 recursion_coeffs[5] += (k ** 4)
                 recursion_coeffs[5] += (k ** 3) * 4 * (delta + nu - 5 + 4 * delta_sum)
                 recursion_coeffs[5] += (k ** 2) * (5 * delta * delta + 2 * (7 * nu - 29) * delta + 2 * nu * (2 * nu - l - 31) - l * l + 149 - 24 * delta_sum * (11 - 2 * nu - 2 * delta) - 8 * delta_prod)
@@ -390,9 +447,57 @@ class ConformalBlockTableSeed2:
             self.m_order.append(m)
             self.n_order.append(0)
 
+        # Find the superfluous poles (including possible triple poles) to cancel
+        for l in range(0, len(self.table)):
+            poles = []
+            zero_poles = []
+            for p in self.table[l].poles:
+                if abs(p) > tiny:
+                    poles.append(p)
+                else:
+                    zero_poles.append(p)
+            poles = zero_poles + poles
+
+            for p in poles:
+                superfluous = True
+                n = 0
+
+                # We should really make sure the pole is a root of all numerators
+                # However, this is automatic if it is a root before differentiating
+                if abs(self.table[l].vector[n].subs(delta, p)) > tiny:
+                    superfluous = False
+                #while n < len(self.table[l].vector) and superfluous == True:
+                #    if abs(self.table[l].vector[n].subs(delta, p)) > tiny:
+                #        superfluous = False
+                #    n += 1
+
+                if superfluous:
+                    self.table[l].poles.remove(p)
+
+                    # A factoring algorithm which works if the zeros are first
+                    for n in range(0, len(self.table[l].vector)):
+                        coeffs = self.table[l].coefficients(self.table[l].vector[n])
+                        if abs(p) > tiny:
+                            new_coeffs = [coeffs[0] / eval_mpfr(-p, prec)]
+                            for i in range(1, len(coeffs) - 1):
+                                new_coeffs.append((new_coeffs[i - 1] - coeffs[i]) / eval_mpfr(p, prec))
+                        else:
+                            coeffs.remove(coeffs[0])
+                            new_coeffs = coeffs
+
+                        prod = 1
+                        self.table[l].vector[n] = 0
+                        for i in range(0, len(new_coeffs)):
+                            self.table[l].vector[n] += prod * new_coeffs[i]
+                            prod *= delta
+
+        def dump(self, name):
+            dump_table_contents(self, name)
+
 class ConformalBlockTableSeed:
     """
-    A class which calculates tables of conformal block derivatives from scratch.
+    A class which calculates tables of conformal block derivatives from scratch
+    using the recursion relations with meromorphic versions of the blocks.
     Usually, it will not be necessary for the user to call it. Instead,
     `ConformalBlockTable` calls it automatically for `m_max = 3` and `n_max = 0`.
     For people wanting to call it with different values of `m_max` and `n_max`,
@@ -843,7 +948,10 @@ class ConformalBlockTable:
             exec(command)
             return
 
-        small_table = ConformalBlockTableSeed(dim, k_max, l_max, min(m_max + 2 * n_max, 3), 0, delta_12, delta_34, odd_spins)
+        if dim % 2 == 0:
+            small_table = ConformalBlockTableSeed2(dim, k_max, l_max, min(m_max + 2 * n_max, 3), 0, delta_12, delta_34, odd_spins)
+        else:
+            small_table = ConformalBlockTableSeed(dim, k_max, l_max, min(m_max + 2 * n_max, 3), 0, delta_12, delta_34, odd_spins)
         self.m_order = small_table.m_order
         self.n_order = small_table.n_order
         self.table = small_table.table
@@ -1475,16 +1583,11 @@ class SDP:
         size = len(self.table[index])
         for r in range(0, size):
             for s in range(0, size):
-                polynomial_vector = self.table[index][r][s].vector
+                polynomial_vector = self.table[index][r][s]
 
-                for n in range(0, len(polynomial_vector)):
-                    expression = polynomial_vector[n].expand()
-
-                    if type(expression) == type(eval_mpfr(1, 10)):
-                        coeff_list = [expression]
-                    else:
-                        coeff_list = sorted(expression.args, key = self.extract_power)
-                    degree = max(degree, self.extract_power(coeff_list[-1]))
+                for n in range(0, len(polynomial_vector.vector)):
+                    expression = polynomial_vector.vector[n].expand()
+                    degree = max(degree, len(polynomial_vector.coefficients(expression)) - 1)
 
         for d in range(0, 2 * (degree // 2) + 1):
             result = self.integral(d, delta_min, poles)
@@ -1556,23 +1659,6 @@ class SDP:
             return array.index(element)
         else:
             return -1
-
-    def extract_power(self, term):
-        """
-        Returns the degree of a single term in a polynomial. Symengine stores these
-        as (coefficient, (delta, exponent)). This is helpful for sorting polynomials
-        which are not sorted by default.
-
-        Parameters
-        ----------
-        term: The symengine formula for a momomial.
-        """
-        if term.args == ():
-            return 0
-        elif term.args[1].args == ():
-            return 1
-        else:
-            return term.args[1].args[1]
 
     def make_laguerre_points(self, degree):
         """
@@ -1750,22 +1836,11 @@ class SDP:
                         expression = polynomial_vector[n].expand()
                         # Impose unitarity bounds and the specified gap
                         expression = expression.subs(delta, delta + delta_min).expand()
-
-                        if type(expression) == type(eval_mpfr(1, 10)):
-                            coeff_list = [expression]
-                        else:
-                            coeff_list = sorted(expression.args, key = self.extract_power)
-                        degree = max(degree, self.extract_power(coeff_list[-1]))
-                        if coeff_list == []:
-                            coeff_list = [0.0]
+                        coeff_list = self.table[j][r][s].coefficients(expression)
+                        degree = max(degree, len(coeff_list) - 1)
 
                         polynomial_node = doc.createElement("polynomial")
-                        for d in range(0, len(coeff_list)):
-                            if d == 0:
-                                coeff = eval_mpfr(coeff_list[0], prec)
-                            else:
-                                coeff = eval_mpfr(coeff_list[d].args[0], prec)
-                    
+                        for coeff in coeff_list:
                             coeff_node = doc.createElement("coeff")
                             coeff_node.appendChild(doc.createTextNode(self.short_string(coeff)))
                             polynomial_node.appendChild(coeff_node)
@@ -1774,6 +1849,7 @@ class SDP:
 
             poles = self.table[j][0][0].poles
             index = self.get_index(laguerre_degrees, degree)
+
             if j >= len(self.bounds):
                 points = [self.points[j - len(self.bounds)][1]]
             elif index == -1:
@@ -2051,21 +2127,7 @@ class SDP:
 
         matrix = DenseMatrix(size, size, entries)
         determinant = matrix.det().expand()
-
-        if type(determinant) == type(eval_mpfr(1, 10)):
-            coeff_list = [determinant]
-        else:
-            coeff_list = sorted(determinant.args, key = self.extract_power)
-        if coeff_list == []:
-            coeff_list = [0.0]
-
-        coeffs = []
-        for d in range(0, len(coeff_list)):
-            if d == 0:
-                coeffs.append(float(coeff_list[0]))
-            else:
-                coeffs.append(float(coeff_list[d].args[0]))
-
+        coeffs = self.table[l][r][s].coefficients(determinant)
         poly = numpy.polynomial.Polynomial(coeffs)
         roots = poly.roots()
 
