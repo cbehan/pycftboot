@@ -85,17 +85,10 @@ def delta_pole(nu, k, l, series):
         pole = 1 - l - k
     elif series == 2:
         pole = 1 + nu - k
-        if type(nu) == type(Integer(1)):
-            pole += aux
     else:
         pole = 1 + l + 2 * nu - k
-        if type(nu) == type(Integer(1)):
-            pole += 2 * aux
 
-    if type(nu) == type(Integer(1)):
-        return pole
-    else:
-        return eval_mpfr(pole, prec)
+    return eval_mpfr(pole, prec)
 
 class LeadingBlockVector:
     def __init__(self, dim, l, m_max, n_max, delta_12, delta_34):
@@ -171,8 +164,6 @@ class ConformalBlockVector:
         old_list = MeromorphicBlockVector(leading_block)
         for k in range(0, len(pol_list)):
             pole = delta_pole(nu, pol_list[k][1], l, pol_list[k][3])
-            if "subs" in dir(pole):
-                pole = pole.subs(aux, 0)
 
             if abs(float(res_list[k].chunks[0].get(0, 0))) < cutoff:
                 self.small_poles.append(pole)
@@ -197,8 +188,6 @@ class ConformalBlockVector:
 
         for k in range(0, len(pol_list)):
             pole = delta_pole(nu, pol_list[k][1], l, pol_list[k][3])
-            if "subs"in dir(pole):
-                pole = pole.subs(aux, 0)
 
             if pole in self.large_poles:
                 for j in range(0, len(self.chunks)):
@@ -296,16 +285,14 @@ class ConformalBlockTableSeed2:
     A class which calculates tables of conformal block derivatives from scratch
     using a power series solution of their fourth order differential equation.
     Usually, it will not be necessary for the user to call it. Instead,
-    `ConformalBlockTable` calls it automatically for `m_max = 3` and `n_max = 0`.
-    People calling it manually may change the value of `m_max` but `n_max` cannot
-    be handled with this method and it is therefore ignored.
+    `ConformalBlockTable` calls it automatically for `m_max = 3`. Note that there
+    is no `n_max` for this method.
     """
-    def __init__(self, dim, k_max, l_max, m_max, n_max, delta_12 = 0, delta_34 = 0, odd_spins = False, name = None):
+    def __init__(self, dim, k_max, l_max, m_max, delta_12 = 0, delta_34 = 0, odd_spins = False, name = None):
         self.dim = dim
         self.k_max = k_max
         self.l_max = l_max
         self.m_max = m_max
-        self.n_max = n_max
         self.delta_12 = delta_12
         self.delta_34 = delta_34
         self.odd_spins = odd_spins
@@ -491,9 +478,6 @@ class ConformalBlockTableSeed2:
                             self.table[l].vector[n] += prod * new_coeffs[i]
                             prod *= delta
 
-        def dump(self, name):
-            dump_table_contents(self, name)
-
 class ConformalBlockTableSeed:
     """
     A class which calculates tables of conformal block derivatives from scratch
@@ -552,9 +536,7 @@ class ConformalBlockTableSeed:
         pol_list = []
         res_list = []
         pow_list = []
-        den_list = []
         new_res_list = []
-        old_den_list = []
 
         # Find out which residues we will ever need to include
         for l in range(0, l_max + k_max + 1):
@@ -582,11 +564,8 @@ class ConformalBlockTableSeed:
             pol_list.append(current_pol_list)
             res_list.append([])
             pow_list.append([])
-            den_list.append([])
             new_res_list.append([])
-            old_den_list.append([])
 
-        old_res_list = MeromorphicBlockVector(leading_blocks[0])
         # Initialize the residues at the appropriate leading blocks
         for l in range(0, l_max + k_max + 1):
             for i in range(0, len(pol_list[l])):
@@ -594,9 +573,7 @@ class ConformalBlockTableSeed:
                 res_list[l].append(MeromorphicBlockVector(leading_blocks[l_new]))
 
                 pow_list[l].append(0)
-                den_list[l].append(1)
                 new_res_list[l].append(0)
-                old_den_list[l].append(1)
 
         for k in range(1, k_max + 1):
             for l in range(0, l_max + k_max + 1):
@@ -623,62 +600,19 @@ class ConformalBlockTableSeed:
                     current_pol_list = []
                     pole1 = delta_pole(nu, pol_list[l][i][1], l, pol_list[l][i][3]) + pol_list[l][i][0]
 
-                    if dim % 2 == 0:
-                        for i_new in range(0, len(res_list[l_new])):
-                            pole2 = delta_pole(nu, pol_list[l_new][i_new][1], l_new, pol_list[l_new][i_new][3])
-                            current_pol_list.append(pole2)
-                            prod *= (pole1 - pole2) * old_den_list[l_new][i_new]
-
-                        den_list[l][i] = prod
-                        for j in range(0, len(new_res_list[l][i].chunks)):
-                            new_res_list[l][i].chunks[j] = new_res_list[l][i].chunks[j].mul_scalar(prod)
-
                     for i_new in range(0, len(res_list[l_new])):
                         pole2 = delta_pole(nu, pol_list[l_new][i_new][1], l_new, pol_list[l_new][i_new][3])
 
-                        if dim % 2 == 0:
-                            fact = omit_all(current_pol_list, [pole2], pole1)
-                            for i_other in range(0, len(res_list[l_new])):
-                                if i_other != i_new:
-                                    fact *= old_den_list[l_new][i_other]
-                        else:
-                            fact = eval_mpfr(1, prec) / eval_mpfr(pole1 - pole2, prec)
-
-                        for j in range(0, len(old_res_list.chunks)):
-                            for n in range(0, old_res_list.chunks[j].nrows()):
-                                element = res_list[l_new][i_new].chunks[j].get(n, 0)
-                                element = element * fact
-                                element = element.expand()
-                                old_res_list.chunks[j].set(n, 0, element)
-                            new_res_list[l][i].chunks[j] = new_res_list[l][i].chunks[j].add_matrix(old_res_list.chunks[j])
+                        for j in range(0, len(new_res_list[l][i].chunks)):
+                            new_res_list[l][i].chunks[j] = new_res_list[l][i].chunks[j].add_matrix(res_list[l_new][i_new].chunks[j].mul_scalar(1 / eval_mpfr(pole1 - pole2, prec)))
 
             for l in range(0, l_max + k_max + 1):
                 for i in range(0, len(res_list[l])):
                     if pow_list[l][i] >= k_max:
                         continue
 
-                    if "expand" in dir(den_list[l][i]):
-                        den_list[l][i] = den_list[l][i].expand()
-                    old_den_list[l][i] = den_list[l][i]
-
                     for j in range(0, len(res_list[l][i].chunks)):
                          res_list[l][i].chunks[j] = new_res_list[l][i].chunks[j]
-
-        # Divide by the common denominator again
-        if dim % 2 == 0:
-            for l in range(0, l_max + k_max + 1):
-                for i in range(0, len(res_list[l])):
-                    if "expand" in dir(den_list[l][i]):
-                        den_list[l][i] = den_list[l][i].expand()
-
-                    for j in range(0, len(res_list[l][i].chunks)):
-                        for n in range(0, res_list[l][i].chunks[j].nrows()):
-                            element = res_list[l][i].chunks[j].get(n, 0)
-                            element = element.expand()
-                            element = element / den_list[l][i]
-                            element = element.expand()
-                            element = element.subs(aux, 0)
-                            res_list[l][i].chunks[j].set(n, 0, element)
 
         # Perhaps poorly named, S keeps track of a linear combination of derivatives
         # We get this by including the essential singularity, then stripping it off again
@@ -841,14 +775,10 @@ class ConformalBlockTableSeed:
         series:   The parameter i desribing the three types of poles in
                   arXiv:1406.4858.
         """
-        zero = 0
         two = eval_mpfr(2, prec)
-        check_numerator = False
         # Time saving special case
         if series != 2 and k % 2 != 0 and delta_12 == 0 and delta_34 == 0:
             return 0
-        elif type(nu) == type(Integer(1)):
-            zero = aux
 
         if series == 1:
             ret = - ((k * (-4) ** k) / (factorial(k) ** 2)) * sympy.rf((1 - k + delta_12) / two, k) * sympy.rf((1 - k + delta_34) / two, k)
@@ -858,30 +788,13 @@ class ConformalBlockTableSeed:
             else:
                 return ret * (sympy.rf(l + 2 * nu, k) / sympy.rf(l + nu, k))
         elif series == 2:
-            ret = ((k * sympy.rf(nu + 1, k - 1)) / (factorial(k) ** 2))
             factors = [l + nu + 1 - delta_12, l + nu + 1 + delta_12, l + nu + 1 - delta_34, l + nu + 1 + delta_34]
-
-            if l + nu == k:
-                ret *= zero / (l + nu + k)
-            else:
-                ret *= (l + nu - k) / (l + nu + k)
-
-            if k >= l + nu and type((l + nu - k) / 2) == type(Integer(1)):
-                ret *= -4 * sympy.rf(-nu, nu) * factorial(k - nu) / (zero * (sympy.rf((l + nu - k + 1) / 2, k) * sympy.rf((l + nu - k) / 2, (k - l - nu) / 2) * factorial(((l + nu - k) / 2) + (k - 1))) ** 2)
-            elif k >= l + nu + 1 and type((l + nu + 1 - k) / 2) == type(Integer(1)):
-                ret *= -4 * sympy.rf(-nu, nu) * factorial(k - nu) / (zero * (sympy.rf((l + nu - k) / 2, k) * sympy.rf((l + nu - k + 1) / 2, (k - 1 - l - nu) / 2) * factorial(((l + nu - k + 1) / 2) + (k - 1))) ** 2)
-            elif k >= nu and type(nu) == type(Integer(1)):
-                ret *= -sympy.rf(-nu, nu) * factorial(k - nu) * zero / ((sympy.rf((l + nu - k + 1) / 2, k) * sympy.rf((l + nu - k) / 2, k)) ** 2)
-            else:
-                ret *= sympy.rf(-nu, k + 1) / ((sympy.rf((l + nu - k + 1) / 2, k) * sympy.rf((l + nu - k) / 2, k)) ** 2)
+            ret = ((k * sympy.rf(nu + 1, k - 1)) / (factorial(k) ** 2)) * ((l + nu - k) / (l + nu + k))
+            ret *= sympy.rf(-nu, k + 1) / ((sympy.rf((l + nu - k + 1) / 2, k) * sympy.rf((l + nu - k) / 2, k)) ** 2)
 
             for f in factors:
-                if -k < f <= k and type((f - k) / 2) == type(Integer(1)):
-                    ret *= sympy.rf((f - k) / 2, (k - f) / 2) * factorial(((f + k) / 2) - 1) * zero / 2
-                else:
-                    ret *= sympy.rf((f - k) / 2, k)
-
-            return ret.expand()
+                ret *= sympy.rf((f - k) / 2, k)
+            return ret
         else:
             return - ((k * (-4) ** k) / (factorial(k) ** 2)) * (sympy.rf(1 + l - k, k) * sympy.rf((1 - k + delta_12) / two, k) * sympy.rf((1 - k + delta_34) / two, k) / sympy.rf(1 + nu + l - k, k))
 
@@ -949,7 +862,7 @@ class ConformalBlockTable:
             return
 
         if dim % 2 == 0:
-            small_table = ConformalBlockTableSeed2(dim, k_max, l_max, min(m_max + 2 * n_max, 3), 0, delta_12, delta_34, odd_spins)
+            small_table = ConformalBlockTableSeed2(dim, k_max, l_max, min(m_max + 2 * n_max, 3), delta_12, delta_34, odd_spins)
         else:
             small_table = ConformalBlockTableSeed(dim, k_max, l_max, min(m_max + 2 * n_max, 3), 0, delta_12, delta_34, odd_spins)
         self.m_order = small_table.m_order
