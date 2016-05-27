@@ -192,7 +192,7 @@ class ConformalBlockTableSeed:
     the parameters and attributes are the same as those of `ConformalBlockTable`.
     It also supports the `dump` method.
     """
-    def __init__(self, dim, k_max, l_max, m_max, n_max, delta_12 = 0, delta_34 = 0, odd_spins = False, name = None):
+    def __init__(self, dim, k_max, l_max, m_max, n_max, delta_12 = 0, delta_34 = 0, odd_spins = False):
         self.dim = dim
         self.k_max = k_max
         self.l_max = l_max
@@ -209,12 +209,6 @@ class ConformalBlockTableSeed:
             step = 1
         else:
             step = 2
-
-        if name != None:
-            dump_file = open(name, 'r')
-            command = dump_file.read()
-            exec(command)
-            return
 
         derivative_order = m_max + 2 * n_max
         nu = (dim / Integer(2)) - 1
@@ -329,125 +323,12 @@ class ConformalBlockTableSeed:
             conformal_blocks.append(conformal_block)
             self.table.append(PolynomialVector([], [l, 0], conformal_block.large_poles))
 
-        a = Symbol('a')
-        b = Symbol('b')
-        hack = Symbol('hack')
-        old_coeff_grid = []
-
-        rules1 = []
-        rules2 = []
-        old_expression1 = sqrt(a ** 2 - b) / (hack + sqrt((hack - a) ** 2 - b) + hack * sqrt(hack - a + sqrt((hack - a) ** 2 - b)))
-        old_expression2 = (hack - sqrt((hack - a) ** 2 - b)) / sqrt(a ** 2 - b)
-
-        for n in range(0, m_max + 2 * n_max + 1):
-            old_coeff_grid.append([0] * (m_max + 2 * n_max + 1))
-
-        for n in range(0, n_max + 1):
-            for m in range(0, 2 * (n_max - n) + m_max + 1):
-                if n == 0 and m == 0:
-                    expression1 = old_expression1
-                    expression2 = old_expression2
-                elif m == 0:
-                    old_expression1 = old_expression1.diff(b)
-                    old_expression2 = old_expression2.diff(b)
-                    expression1 = old_expression1
-                    expression2 = old_expression2
-                else:
-                    expression1 = expression1.diff(a)
-                    expression2 = expression2.diff(a)
-
-                rules1.append(expression1.subs({hack : eval_mpfr(2, prec), a : 1, b : 0}))
-                rules2.append(expression2.subs({hack : eval_mpfr(2, prec), a : 1, b : 0}))
-                self.m_order.append(m)
-                self.n_order.append(n)
-
+        (rules1, rules2, self.m_order, self.n_order) = rules(m_max, n_max)
         # If b is always 0, then eta is always 1
         if n_max == 0:
-            _x = Symbol('_x')
-            r = function_symbol('r', a)
-            g = function_symbol('g', r)
-
-            for m in range(0, derivative_order + 1):
-                if m == 0:
-                    old_expression = g
-                    g = function_symbol('g', _x)
-                else:
-                    old_expression = old_expression.diff(a)
-
-                expression = old_expression
-                for i in range(1, m + 1):
-                    expression = expression.subs(Derivative(r, [a] * i), rules1[i])
-
-                for l in range(0, len(conformal_blocks)):
-                    new_deriv = expression
-                    for i in range(1, m + 1):
-                        new_deriv = new_deriv.subs(Subs(Derivative(g, [_x] * i), [_x], [r]), conformal_blocks[l].chunks[0].get(i, 0))
-                    if m == 0:
-                        new_deriv = conformal_blocks[l].chunks[0].get(0, 0)
-                    self.table[l].vector.append(new_deriv.expand())
-
-            # Prevent further execution
-            n_max = -1
-
-        r = function_symbol('r', a, b)
-        eta = function_symbol('eta', a, b)
-        old_coeff_grid[0][0] = 1
-        order = 0
-
-        for n in range(0, n_max + 1):
-            for m in range(0, 2 * (n_max - n) + m_max + 1):
-                # Hack implementation of the g(r(a, b), eta(a, b)) chain rule
-                if n == 0 and m == 0:
-                    coeff_grid = self.deepcopy(old_coeff_grid)
-                elif m == 0:
-                    for i in range(m + n - 1, -1, -1):
-                        for j in range(m + n - i - 1, -1, -1):
-                            coeff = old_coeff_grid[i][j]
-                            if type(coeff) == type(1):
-                                coeff_deriv = 0
-                            else:
-                                coeff_deriv = coeff.diff(b)
-                            old_coeff_grid[i + 1][j] += coeff * r.diff(b)
-                            old_coeff_grid[i][j + 1] += coeff * eta.diff(b)
-                            old_coeff_grid[i][j] = coeff_deriv
-                    coeff_grid = self.deepcopy(old_coeff_grid)
-                else:
-                    for i in range(m + n - 1, -1, -1):
-                        for j in range(m + n - i - 1, -1, -1):
-                            coeff = coeff_grid[i][j]
-                            if type(coeff) == type(1):
-                                coeff_deriv = 0
-                            else:
-                                coeff_deriv = coeff.diff(a)
-                            coeff_grid[i + 1][j] += coeff * r.diff(a)
-                            coeff_grid[i][j + 1] += coeff * eta.diff(a)
-                            coeff_grid[i][j] = coeff_deriv
-
-                # Replace r and eta derivatives with the rules found above
-                deriv = self.deepcopy(coeff_grid)
-                for l in range(order, 0, -1):
-                    for i in range(0, m + n + 1):
-                        for j in range(0, m + n - i + 1):
-                            if type(deriv[i][j]) != type(1):
-                                deriv[i][j] = deriv[i][j].subs(Derivative(r, [a] * self.m_order[l] + [b] * self.n_order[l]), rules1[l])
-                                deriv[i][j] = deriv[i][j].subs(Derivative(r, [b] * self.n_order[l] + [a] * self.m_order[l]), rules1[l])
-                                deriv[i][j] = deriv[i][j].subs(Derivative(eta, [a] * self.m_order[l] + [b] * self.n_order[l]), rules2[l])
-                                deriv[i][j] = deriv[i][j].subs(Derivative(eta, [b] * self.n_order[l] + [a] * self.m_order[l]), rules2[l])
-
-                # Replace conformal block derivatives similarly for each spin
-                for l in range(0, len(conformal_blocks)):
-                    new_deriv = 0
-                    for i in range(0, m + n + 1):
-                        for j in range(0, m + n - i + 1):
-                            new_deriv += deriv[i][j] * conformal_blocks[l].chunks[j].get(i, 0)
-                    self.table[l].vector.append(new_deriv.expand())
-                order += 1
+            chain_rule_single(self.m_order, rules1, self.table, conformal_blocks, lambda l, i: conformal_blocks[l].chunks[0].get(i, 0))
+        else:
+            chain_rule_double(self.m_order, self.n_order, rules1, rules2, self.table, conformal_blocks)
 
     def dump(self, name):
         dump_table_contents(self, name)
-
-    def deepcopy(self, array):
-        ret = []
-        for el in array:
-            ret.append(list(el))
-        return ret

@@ -79,7 +79,7 @@ class ConformalBlockTableSeed2:
     `ConformalBlockTable` calls it automatically for `m_max = 3`. Note that there
     is no `n_max` for this method.
     """
-    def __init__(self, dim, k_max, l_max, m_max, delta_12 = 0, delta_34 = 0, odd_spins = False, name = None):
+    def __init__(self, dim, k_max, l_max, m_max, delta_12 = 0, delta_34 = 0, odd_spins = False):
         self.dim = dim
         self.k_max = k_max
         self.l_max = l_max
@@ -183,41 +183,8 @@ class ConformalBlockTableSeed2:
                     conformal_blocks[l // step][m] = conformal_blocks[l // step][m].expand()
                     prod *= (delta + k - m)
 
-        a = Symbol('a')
-        hack = Symbol('hack')
-
-        rules = []
-        expression = a / (hack + (hack - a) + hack * sqrt(2 * hack - 2 * a))
-
-        for m in range(0, m_max + 1):
-            rules.append(expression.subs({hack : eval_mpfr(2, prec), a : 1}))
-            expression = expression.diff(a)
-
-        _x = Symbol('_x')
-        r = function_symbol('r', a)
-        g = function_symbol('g', r)
-
-        for m in range(0, m_max + 1):
-            if m == 0:
-                old_expression = g
-                g = function_symbol('g', _x)
-            else:
-                old_expression = old_expression.diff(a)
-
-            expression = old_expression
-            for i in range(1, m + 1):
-                expression = expression.subs(Derivative(r, [a] * i), rules[i])
-
-            for l in range(0, len(conformal_blocks)):
-                new_deriv = expression
-                for i in range(1, m + 1):
-                    new_deriv = new_deriv.subs(Subs(Derivative(g, [_x] * i), [_x], [r]), conformal_blocks[l][i])
-                if m == 0:
-                    new_deriv = conformal_blocks[l][0]
-                self.table[l].vector.append(new_deriv.expand())
-
-            self.m_order.append(m)
-            self.n_order.append(0)
+        (rules1, rules2, self.m_order, self.n_order) = rules(m_max, 0)
+        chain_rule_single(self.m_order, rules1, self.table, conformal_blocks, lambda l, i: conformal_blocks[l][i])
 
         # Find the superfluous poles (including possible triple poles) to cancel
         for l in range(0, len(self.table)):
