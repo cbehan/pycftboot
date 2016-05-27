@@ -305,12 +305,6 @@ class ConformalBlockTableSeed2:
         else:
             step = 2
 
-        if name != None:
-            dump_file = open(name, 'r')
-            command = dump_file.read()
-            exec(command)
-            return
-
         pole_set = []
         conformal_blocks = []
         nu = eval_mpfr((dim / Integer(2)) - 1, prec)
