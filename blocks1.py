@@ -243,7 +243,7 @@ class ConformalBlockTableSeed:
             current_pol_list = []
 
             for k in range(1, k_max + 1):
-                if l <= l_max:
+                if l + k <= l_max + k_max:
                     if delta_residue(nu, k, l, delta_12, delta_34, 1) != 0:
                         current_pol_list.append((k, k, l + k, 1))
 
