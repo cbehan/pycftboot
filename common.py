@@ -63,6 +63,8 @@ def coefficients(polynomial):
     """
     if not "args" in dir(polynomial):
         return [polynomial]
+    if polynomial.args == ():
+        return [polynomial]
 
     coeff_list = sorted(polynomial.args, key = extract_power)
     degree = extract_power(coeff_list[-1])
