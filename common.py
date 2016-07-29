@@ -292,7 +292,7 @@ def chain_rule_double_symengine(m_order, n_order, rules1, rules2, table, conform
                 deriv = deriv.subs(Derivative(r, [b] * n_order[l] + [a] * m_order[l]), rules1[l])
                 deriv = deriv.subs(Derivative(eta, [a] * m_order[l] + [b] * n_order[l]), rules2[l])
                 deriv = deriv.subs(Derivative(eta, [b] * n_order[l] + [a] * m_order[l]), rules2[l])
-            
+
             for l in range(0, len(conformal_blocks)):
                 new_deriv = deriv
                 for i in range(1, m + n + 1):

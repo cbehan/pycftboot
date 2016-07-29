@@ -538,7 +538,7 @@ class SDP:
                 if type(vector_types[i][0][j][0]) != type([]):
                     vector_types[i][0][j] = [[vector_types[i][0][j]]]
 
-        # Again, fill in arguments that need not be specified for single correlators   
+        # Again, fill in arguments that need not be specified for single correlators
         for i in range(0, len(vector_types)):
             for j in range(0, len(vector_types[i][0])):
                 for k in range(0, len(vector_types[i][0][j])):
@@ -747,7 +747,7 @@ class SDP:
         index: The position of the matrix in `table` whose basis needs updating.
         """
         poles = self.table[index][0][0].poles
-        delta_min = mpmath.mpf(self.bounds[index].__str__())        
+        delta_min = mpmath.mpf(self.bounds[index].__str__())
         bands = []
         matrix = []
 
