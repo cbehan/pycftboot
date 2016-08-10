@@ -30,9 +30,9 @@ if have_mpfr == False:
 
 # Relocate some self-contained classes to separate files
 # Importing them would not make sense because they refer back to things in this file
-execfile("common.py")
-execfile("blocks1.py")
-execfile("blocks2.py")
+exec(open("common.py").read())
+exec(open("blocks1.py").read())
+exec(open("blocks2.py").read())
 
 class PolynomialVector:
     """

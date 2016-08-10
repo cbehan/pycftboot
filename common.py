@@ -53,7 +53,7 @@ def extract_power(term):
     elif term.args[1].args == ():
         return 1
     else:
-        return term.args[1].args[1]
+        return int(term.args[1].args[1])
 
 def coefficients(polynomial):
     """
