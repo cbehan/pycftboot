@@ -915,7 +915,7 @@ class SDP:
 
     def write_xml(self, obj, norm, name = "mySDP"):
         """
-        Outputs an XML file decribing the `table`, `bounds`, `points` and `basis`
+        Outputs an XML file describing the `table`, `bounds`, `points` and `basis`
         for this `SDP` in a format that `SDPB` can use to check for solvability.
 
         Parameters
