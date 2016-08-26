@@ -1241,9 +1241,8 @@ class SDP:
 
         identity = DenseMatrix(zeros, 1, self.unit)
         extremal_matrix = DenseMatrix(zeros, zeros, extremal_blocks)
-        inverse = extremal_matrix.inv()
 
-        return inverse.mul_matrix(identity)
+        return extremal_matrix.solve(identity)
 
     def extremal_dimensions(self, functional, spin_irrep):
         """

@@ -153,7 +153,6 @@ class ConformalBlockVector:
                 for j in range(0, len(self.large_poles)):
                     matrix.append(1 / (((1 / cutoff) - self.large_poles[j]) ** (i + 1)))
             matrix = DenseMatrix(len(self.large_poles), len(self.large_poles), matrix)
-            matrix = matrix.inv()
 
         for j in range(0, len(leading_block.chunks)):
             self.chunks.append(leading_block.chunks[j])
@@ -173,7 +172,7 @@ class ConformalBlockVector:
                 for i in range(0, len(self.large_poles) - (len(self.large_poles) // 2)):
                     vector.append(1 / (((1 / cutoff) - pole) ** (i + 1)))
                 vector = DenseMatrix(len(self.large_poles), 1, vector)
-                vector = matrix.mul_matrix(vector)
+                vector = matrix.solve(vector)
                 for i in range(0, len(self.large_poles)):
                     for j in range(0, len(self.chunks)):
                         self.chunks[j] = self.chunks[j].add_matrix(res_list[k].chunks[j].mul_scalar(vector.get(i, 0) * omit_all(self.large_poles, [self.large_poles[i]], delta)))
