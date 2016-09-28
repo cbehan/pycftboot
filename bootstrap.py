@@ -655,8 +655,8 @@ class SDP:
         if type(gapped_spin_irrep) == type(1):
             gapped_spin_irrep = [gapped_spin_irrep, 0]
         for l in range(0, len(self.table)):
-                if self.table[l][0][0].label == gapped_spin_irrep:
-                    return self.bounds[l]
+            if self.table[l][0][0].label == gapped_spin_irrep:
+                return self.bounds[l]
 
     def set_bound(self, gapped_spin_irrep = -1, delta_min = -1, reset_basis = True):
         """
@@ -702,6 +702,24 @@ class SDP:
 
             if reset_basis:
                 self.set_basis(l)
+
+    def get_option(self, key):
+        """
+        Returns the string representation of a value that `SDPB` will use, whether
+        or not it has been explicitly set.
+
+        Parameters
+        ----------
+        key: The name of the `SDPB` parameter without any "--" at the beginning or
+        "=" at the end.
+        """
+        if key in sdpb_options:
+            ret = sdpb_defaults[sdpb_options.index(key)]
+            opt_string = "--" + key + "="
+            for i in range(0, len(self.options)):
+                if self.options[i][:len(opt_string)] == opt_string:
+                    ret = self.options[i][len(opt_string):]
+            return ret
 
     def set_option(self, key = None, value = None):
         """
