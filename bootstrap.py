@@ -16,6 +16,7 @@ from __future__ import print_function
 import xml.dom.minidom
 import numpy.polynomial
 import mpmath
+import time
 import re
 import os
 
@@ -1115,13 +1116,23 @@ class SDP:
         if type(spin_irrep) == type(1):
             spin_irrep = [spin_irrep, 0]
 
+        checkpoints = False
         old = self.get_bound(spin_irrep)
         while abs(upper - lower) > threshold:
             test = (lower + upper) / 2.0
             print("Trying " + test.__str__())
-
             self.set_bound(spin_irrep, test)
-            result = self.iterate()
+
+            # Using the same name twice in a row is only dangerous if the runs are really long
+            start = time.time()
+            if checkpoints:
+                result = self.iterate(name = str(start))
+            else:
+                result = self.iterate()
+            end = time.time()
+            if int(end - start) > int(self.get_option("checkpointInterval")):
+                checkpoints = True
+
             if result == False:
                 upper = test
             else:
