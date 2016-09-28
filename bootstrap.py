@@ -712,16 +712,15 @@ class SDP:
         Parameters
         ----------
         key:   [Optional] The name of the `SDPB` parameter being set without any
-               "--" at the beginning or "=" at the end. No checking is done to
-               ensure that it is a valid parameter. Defaults to `None` which means
-               all parameters will be reset to their default values.
+               "--" at the beginning or "=" at the end. Defaults to `None` which
+               means all parameters will be reset to their default values.
         value: [Optional] The string or numerical value that should accompany `key`.
                Defaults to `None` which means that the parameter for `key` will be
                reset to its default value.
         """
         if key == None:
             self.options = []
-        else:
+        elif key in sdpb_options:
             found = False
             opt_string = "--" + key + "="
             for i in range(0, len(self.options)):
@@ -734,6 +733,8 @@ class SDP:
                 self.options[i] = opt_string + str(value)
             elif found == False and value != None:
                 self.options.append(opt_string + str(value))
+        else:
+            print("Unknown option")
 
     def set_basis(self, index):
         """
@@ -1070,7 +1071,7 @@ class SDP:
         obj = [0.0] * len(self.table[0][0][0].vector)
         self.write_xml(obj, self.unit, name)
 
-        os.spawnvp(os.P_WAIT, "/usr/bin/sdpb", ["sdpb", "-s", name + ".xml", "--precision=" + str(prec), "--findPrimalFeasible", "--findDualFeasible", "--noFinalCheckpoint"] + self.options)
+        os.spawnvp(os.P_WAIT, sdpb_path, ["sdpb", "-s", name + ".xml", "--precision=" + str(prec), "--findPrimalFeasible", "--findDualFeasible", "--noFinalCheckpoint"] + self.options)
         out_file = open(name + ".out", 'r')
         terminate_line = next(out_file)
         terminate_reason = terminate_line.partition(" = ")[-1]
@@ -1150,7 +1151,7 @@ class SDP:
             obj.append(self.unit[i] / prod)
 
         self.write_xml(obj, norm, name)
-        os.spawnvp(os.P_WAIT, "/usr/bin/sdpb", ["sdpb", "-s", name + ".xml", "--precision=" + str(prec), "--noFinalCheckpoint"] + self.options)
+        os.spawnvp(os.P_WAIT, sdpb_path, ["sdpb", "-s", name + ".xml", "--precision=" + str(prec), "--noFinalCheckpoint"] + self.options)
         out_file = open(name + ".out", 'r')
         next(out_file)
         primal_line = next(out_file)
@@ -1185,7 +1186,7 @@ class SDP:
         self.write_xml(obj, self.unit, name)
         self.set_bound(spin_irrep, old)
 
-        os.spawnvp(os.P_WAIT, "/usr/bin/sdpb", ["sdpb", "-s", name + ".xml", "--precision=" + str(prec), "--noFinalCheckpoint"] + self.options)
+        os.spawnvp(os.P_WAIT, sdpb_path, ["sdpb", "-s", name + ".xml", "--precision=" + str(prec), "--noFinalCheckpoint"] + self.options)
         out_file = open(name + ".out", 'r')
         for i in range(0, 7):
             next(out_file)

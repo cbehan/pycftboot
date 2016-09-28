@@ -11,6 +11,10 @@ ell = Symbol('ell')
 delta  = Symbol('delta')
 delta_ext = Symbol('delta_ext')
 
+sdpb_path = "/usr/bin/sdpb"
+sdpb_options = ["maxThreads", "checkpointInterval", "maxIterations", "maxRuntime", "dualityGapThreshold", "primalErrorThreshold", "dualErrorThreshold", "initialMatrixScalePrimal", "initialMatrixScaleDual", "feasibleCenteringParameter", "infeasibleCenteringParameter", "stepLengthReduction", "choleskyStabilizeThreshold", "maxComplementarity"]
+sdpb_defaults = ["4", "3600", "500", "86400", "1e-30", "1e-30", "1e-30", "1e+20", "1e+20", "0.1", "0.3", "0.7", "1e-40", "1e+100"]
+
 def deepcopy(array):
     """
     Copies a list of a list so that entries can be changed non-destructively.
