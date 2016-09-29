@@ -691,9 +691,7 @@ class SDP:
             if type(gapped_spin_irrep) == type(1):
                 gapped_spin_irrep = [gapped_spin_irrep, 0]
 
-            for l in range(0, len(self.table)):
-                if self.table[l][0][0].label == gapped_spin_irrep:
-                    break
+            l = self.get_table_index(gapped_spin_irrep)
             spin = gapped_spin_irrep[0]
 
             if delta_min == -1:
@@ -755,6 +753,23 @@ class SDP:
                 self.options.append(opt_string + str(value))
         else:
             print("Unknown option")
+
+    def get_table_index(self, spin_irrep):
+        """
+        Searches for the label of a `PolynomialVector` and returns its position in
+        `table` or -1 if not found.
+
+        Parameters
+        ----------
+        spin_irrep: An ordered pair of the type passed to `set_bound`. Used to
+                    label the spin and representation being searched.
+        """
+        if type(spin_irrep) == type(1):
+            spin_irrep = [spin_irrep, 0]
+        for l in range(0, len(self.table)):
+            if self.table[l][0][0].label == spin_irrep:
+                return l
+        return -1
 
     def set_basis(self, index):
         """
@@ -955,11 +970,9 @@ class SDP:
 
         # Handle discretely added points
         for p in self.points:
-            for l in range(0, len(self.table)):
-                if self.table[l][0][0].label == p[0]:
-                    break
-
+            l = self.get_table_index(p[0])
             size = len(self.table[l])
+
             outer_list = []
             for r in range(0, size):
                 inner_list = []
@@ -1114,11 +1127,9 @@ class SDP:
                     label the spin and representation of the operator whose
                     dimension is being bounded.
         """
-        if type(spin_irrep) == type(1):
-            spin_irrep = [spin_irrep, 0]
-
         checkpoints = False
         old = self.get_bound(spin_irrep)
+
         while abs(upper - lower) > threshold:
             test = (lower + upper) / 2.0
             print("Trying " + test.__str__())
@@ -1159,12 +1170,7 @@ class SDP:
         name:       [Optional] Name of the XML file generated in the process without
                     any ".xml" at the end. Defaults to "mySDP".
         """
-        if type(spin_irrep) == type(1):
-            spin_irrep = [spin_irrep, 0]
-
-        for l in range(0, len(self.table)):
-            if self.table[l][0][0].label == spin_irrep:
-                break
+        l = self.get_table_index(spin_irrep)
 
         prod = 1
         for p in self.table[0][0][0].poles:
@@ -1226,8 +1232,6 @@ class SDP:
         name:       [Optional] The name of the XML file generated in the process
                     without any ".xml" at the end. Defaults to "mySDP".
         """
-        if type(spin_irrep) == type(1):
-            spin_irrep = [spin_irrep, 0]
         if obj == None:
             obj = [0.0] * len(self.table[0][0][0].vector)
         if norm == None:
@@ -1272,17 +1276,11 @@ class SDP:
                      `extremal_dimensions` can find. This list must be in the same
                      order used for `dimensions`.
         """
+        extremal_blocks = []
         zeros = min(len(dimensions), len(spin_irreps))
         for i in range(0, zeros):
-            if type(spin_irreps[i]) == type(1):
-                spin_irreps[i] = [spin_irreps[i], 0]
-
-        extremal_blocks = []
-        for i in range(0, zeros):
             for j in range(0, zeros):
-                for l in range(0, len(self.table)):
-                    if self.table[l][0][0].label == spin_irreps[j]:
-                        break
+                l = self.get_table_index(spin_irreps[j])
 
                 temp = 0
                 if len(self.table[l]) > 1:
@@ -1315,14 +1313,9 @@ class SDP:
                     and the second entry is the representation label found in
                     `vector_types`.
         """
-        if type(spin_irrep) == type(1):
-            spin_irrep = [spin_irrep, 0]
-
-        for l in range(0, len(self.table)):
-            if self.table[l][0][0].label == spin_irrep:
-                break
-
         entries = []
+        l = self.get_table_index(spin_irrep)
+
         size = len(self.table[l])
         for r in range(0, size):
             for s in range(0, size):
