@@ -720,6 +720,7 @@ class SDP:
             for i in range(0, len(self.options)):
                 if self.options[i][:len(opt_string)] == opt_string:
                     ret = self.options[i][len(opt_string):]
+                    break
             return ret
 
     def set_option(self, key = None, value = None):
@@ -1143,18 +1144,18 @@ class SDP:
 
     def opemax(self, dimension, spin_irrep, name = "mySDP"):
         """
-        Returns the maximum allowed value of the squared OPE coefficient for an
-        operator with a prescribed scaling dimension, spin and global symmetry
-        representation. It is best to compare several OPE coefficients so that
-        numerical artifacts cancel out.
+        Returns the maximum allowed squared length of the vector of OPE coefficients
+        involving an operator with a prescribed scaling dimension, spin and global
+        symmetry representation. It is best to compare several OPE coefficients so
+        that numerical artifacts cancel out.
 
         Parameters
         ----------
-        dimension:  The scaling dimension of the operator whose OPE coefficient is
-                    being bounded.
+        dimension:  The scaling dimension of the operator whose OPE coefficients
+                    are having their length being bounded.
         spin_irrep: An ordered pair of the type passed to `set_bound`. Used to label
                     the spin and representation of the operator whose OPE
-                    coefficient is being bounded.
+                    coefficients have their length being bounded.
         name:       [Optional] Name of the XML file generated in the process without
                     any ".xml" at the end. Defaults to "mySDP".
         """
@@ -1165,10 +1166,6 @@ class SDP:
             if self.table[l][0][0].label == spin_irrep:
                 break
 
-        if len(self.table[l]) > 1:
-            print("Only supported for 1x1 matrices")
-            return 0.0
-
         prod = 1
         for p in self.table[0][0][0].poles:
             prod *= -p
@@ -1178,18 +1175,34 @@ class SDP:
         for i in range(0, len(self.unit)):
             norm.append(self.table[l][0][0].vector[i].subs(delta, dimension))
             obj.append(self.unit[i] / prod)
+        functional = self.solution_functional(self.get_bound(spin_irrep), spin_irrep, obj, norm, name)
 
-        self.write_xml(obj, norm, name)
-        os.spawnvp(os.P_WAIT, sdpb_path, ["sdpb", "-s", name + ".xml", "--precision=" + str(prec), "--noFinalCheckpoint"] + self.options)
         out_file = open(name + ".out", 'r')
         next(out_file)
         primal_line = next(out_file)
+        primal_value = primal_line.partition(" = ")[-1][:-2]
         out_file.close()
 
-        primal_value = primal_line.partition(" = ")[-1][:-2]
-        return float(primal_value)
+        # This primal value will be divided by 1 or something different if the matrix is not 1x1
+        size = len(self.table[l])
+        outer_list = []
+        for r in range(0, size):
+            inner_list = []
+            for s in range(0, size):
+                inner_product = 0.0
+                polynomial_vector = self.reshuffle_with_normalization(self.table[l][r][s].vector, self.norm)
 
-    def solution_functional(self, dimension, spin_irrep, name = "mySDP"):
+                for i in range(0, len(self.table[l][r][s].vector)):
+                    inner_product += functional[i] * polynomial_vector[i]
+                    inner_product = inner_product.subs(delta, dimension)
+
+                inner_list.append(float(inner_product))
+            outer_list.append(inner_list)
+
+        eigenvalues = numpy.linalg.eigvalsh(outer_list)
+        return float(primal_value) / min(eigenvalues)
+
+    def solution_functional(self, dimension, spin_irrep, obj = None, norm = None, name = "mySDP"):
         """
         Returns a functional (list of numerical components) that serves as a
         solution to the `SDP`. Like `iterate`, this sets a bound, generates an XML
@@ -1203,16 +1216,26 @@ class SDP:
         spin_irrep: An ordered pair of the type passed to `set_bound`. Used to label
                     the spin / representation of the operator being given a minimum
                     scaling dimension of `dimension`.
+        obj:        [Optional] The objective vector whose action under the found
+                    functional should be maximized. Defaults to `None` which means
+                    it will be determined automatically just like it is in
+                    `iterate`.
+        norm:       [Optional] Normalization vector which should have unit action
+                    under the functional. Defaults to `None` which means it will be
+                    determined automatically just like it is in `iterate`.
         name:       [Optional] The name of the XML file generated in the process
                     without any ".xml" at the end. Defaults to "mySDP".
         """
         if type(spin_irrep) == type(1):
             spin_irrep = [spin_irrep, 0]
+        if obj == None:
+            obj = [0.0] * len(self.table[0][0][0].vector)
+        if norm == None:
+            norm = self.unit
 
-        obj = [0.0] * len(self.table[0][0][0].vector)
         old = self.get_bound(spin_irrep)
         self.set_bound(spin_irrep, dimension)
-        self.write_xml(obj, self.unit, name)
+        self.write_xml(obj, norm, name)
         self.set_bound(spin_irrep, old)
 
         os.spawnvp(os.P_WAIT, sdpb_path, ["sdpb", "-s", name + ".xml", "--precision=" + str(prec), "--noFinalCheckpoint"] + self.options)
@@ -1321,6 +1344,7 @@ class SDP:
         ret = []
         bound = self.get_bound(spin_irrep)
         for dim in roots:
+            # These might still be very approximate
             if dim.imag > -1e-10 and dim.imag < 0.1 and dim.real > (bound - 0.01):
                 ret.append(dim.real)
         return ret
