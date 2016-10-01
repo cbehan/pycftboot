@@ -1196,7 +1196,7 @@ class SDP:
             inner_list = []
             for s in range(0, size):
                 inner_product = 0.0
-                polynomial_vector = self.reshuffle_with_normalization(self.table[l][r][s].vector, self.norm)
+                polynomial_vector = self.reshuffle_with_normalization(self.table[l][r][s].vector, norm)
 
                 for i in range(0, len(self.table[l][r][s].vector)):
                     inner_product += functional[i] * polynomial_vector[i]
