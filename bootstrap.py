@@ -1172,15 +1172,18 @@ class SDP:
         """
         l = self.get_table_index(spin_irrep)
 
-        prod = 1
+        prod1 = 1
+        prod2 = -1
         for p in self.table[0][0][0].poles:
-            prod *= -p
+            prod1 *= -p
+        for p in self.table[l][0][0].poles:
+            prod2 *= (dimension - p)
 
         obj = []
         norm = []
         for i in range(0, len(self.unit)):
             norm.append(self.table[l][0][0].vector[i].subs(delta, dimension))
-            obj.append(self.unit[i] / prod)
+            obj.append(self.unit[i] / prod1)
         functional = self.solution_functional(self.get_bound(spin_irrep), spin_irrep, obj, norm, name)
 
         out_file = open(name + ".out", 'r')
@@ -1206,7 +1209,8 @@ class SDP:
             outer_list.append(inner_list)
 
         eigenvalues = numpy.linalg.eigvalsh(outer_list)
-        return float(primal_value) / min(eigenvalues)
+        bound = float(primal_value) / min(eigenvalues)
+        return bound * prod2 / (r_cross ** dimension)
 
     def solution_functional(self, dimension, spin_irrep, obj = None, norm = None, name = "mySDP"):
         """
