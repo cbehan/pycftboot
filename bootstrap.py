@@ -1280,23 +1280,95 @@ class SDP:
                      `extremal_dimensions` can find. This list must be in the same
                      order used for `dimensions`.
         """
-        extremal_blocks = []
+        # Builds an auxillary table to store the specific vectors in this sum rule
+        extremal_table = []
         zeros = min(len(dimensions), len(spin_irreps))
         for i in range(0, zeros):
-            for j in range(0, zeros):
-                l = self.get_table_index(spin_irreps[j])
+            extremal_entry = []
+            l = self.get_table_index(spin_irreps[i])
+            size = len(self.table[l])
+            for j in range(0, len(self.unit)):
+                outer_list = []
+                for r in range(0, size):
+                    inner_list = []
+                    for s in range(0, size):
+                        inner_list.append(self.table[l][r][s].vector[j].subs(delta, dimensions[i]))
+                    outer_list.append(inner_list)
+                extremal_entry.append(outer_list)
+            extremal_table.append(extremal_entry)
 
-                temp = 0
-                if len(self.table[l]) > 1:
-                    print("Only supported for 1x1 matrices")
-                    return 0.0
+        # Determines the crossing equations where OPE coefficients only enter diagonally
+        # We also demand that the equations be inhomogeneous
+        # This prevents some OPE coefficients from appearing (Z2-odd ones for example), so we must return to them
+        initial_rows = []
+        initial_coeffs = []
+        for i in range(0, len(self.unit)):
+            j = 0
+            involved_coeffs = []
+            good_row = (abs(self.unit[i]) > tiny)
+            while j < zeros and good_row == True:
+                size = len(extremal_table[j])
+                for r in range(0, size):
+                    for s in range(0, size):
+                        if abs(extremal_table[j][r][s]) > tiny:
+                            if r == s:
+                                involved_coeffs.append((j, r, s))
+                            else:
+                                good_row = False
+                j += 1
+            # See if new coefficients are brought in by this row
+            if good_row == True:
+                initial_rows.append(i)
+                for trip in involved_coeffs:
+                    if trip in initial_coeffs:
+                        continue
+                    initial_coeffs.append(trip)
 
-                polynomial_vector = self.table[l][temp][temp].vector[i].subs(delta, dimensions[j])
-                extremal_blocks.append(float(polynomial_vector))
+        # If there are more operators than crossing equations, we must remove those of highest dimension
+        if len(initial_coeffs) > len(initial_rows):
+            refine = True
+            kept_coeffs = []
+            new_dimensions = dimensions
+            new_spin_irreps = spin_irreps
 
-        identity = DenseMatrix(zeros, 1, self.unit)
+            while refine == True:
+                index_new = new_dimensions.index(min(new_dimensions))
+                # Allow for different operators of the same dimension
+                target_dimension = new_dimensions[index_new]
+                target_spin_irrep = new_spin_irreps[index_new]
+                for index_old in range(0, len(dimensions)):
+                    if abs(dimensions[index_old] - target_dimension) < tiny and spin_irreps[index_old] == target_spin_irrep:
+                        break
+                new_coeffs = []
+                for trip in initial_coeffs:
+                    if trip[0] == index_old:
+                        new_coeffs.append(trip)
+                if len(new_coeffs) + len(kept_coeffs) <= len(initial_rows):
+                    kept_coeffs = kept_coeffs + new_coeffs
+                    new_dimensions = new_dimensions[:index_new] + new_dimensions[index_new + 1:]
+                    new_spin_irreps = new_spin_irreps[:index_new] + new_spin_irreps[index_new + 1:]
+                    refine = (len(new_dimensions) > 0)
+                else:
+                    refine = False
+            initial_coeffs = kept_coeffs
+
+        # If there are more crossing equations than operators, we must omit the ones corresponding to high derivatives
+        # The last case might land us in this one as well if some OPE coefficients show up in pairs
+        if len(initial_rows) > len(initial_coeffs):
+            initial_rows = sorted(initial_rows, key = lambda i: self.m_order[i] + self.n_order[i])
+            initial_rows = initial_rows[:len(initial_coeffs)]
+
+        # Solve our system now that it is square      
+        identity = []
+        extremal_blocks = []
+        zeros = len(initial_rows)
+        for i in initial_rows:
+            identity.append(self.unit[i])
+            for trip in initial_coeffs:
+                (j, r, s) = trip
+                extremal_blocks.append(float(extremal_table[j][r][s].vector[i]))
+        identity = DenseMatrix(zeros, 1, identity)
         extremal_matrix = DenseMatrix(zeros, zeros, extremal_blocks)
-
         return extremal_matrix.solve(identity)
 
     def extremal_dimensions(self, functional, spin_irrep):
