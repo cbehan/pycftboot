@@ -294,6 +294,10 @@ class ConvolvedBlockTable:
     n_max:       The number of `b` derivatives there are where the standard
                  co-ordinates are expressed as `(a + sqrt(b)) / 2` and
                  `(a - sqrt(b)) / 2`. This is at most the `n_max` of `block_table`.
+    delta_12:    The difference between the external scaling dimensions of operator
+                 1 and operator 2, inherited from `block_table`.
+    delta_32:    The difference between the external scaling dimensions of operator
+                 3 and operator 4, inherited from `block_table`.
     table:       A list of `PolynomialVector`s. A block's position in the table is
                  equal to its spin if `odd_spins` is `True`. Otherwise it is equal
                  to half of the spin.
@@ -311,6 +315,8 @@ class ConvolvedBlockTable:
         self.l_max = block_table.l_max
         self.m_max = block_table.m_max
         self.n_max = block_table.n_max
+        self.delta_12 = block_table.delta_12
+        self.delta_34 = block_table.delta_34
 
         self.m_order = []
         self.n_order = []
@@ -498,6 +504,11 @@ class SDP:
                      blocks are normalized under the convention that all OPE
                      coefficients involving the identity are 1. It should not be
                      necessary to change this.
+    dimension_set:   A copy of `vector_types` but with the entries changed at the
+                     innermost level. The ordered quadruples do not correspond to
+                     prefactors and list positions anymore but to the four external
+                     operator dimensions that couple to the block in this position.
+                     It should not be necessary to change this.
     basis:           A list of matrices which has as many matrices as `table`.
                      Each triangular matrix stores a set of orthogonal polynomials
                      in the monomial basis. It should not be necessary to change
@@ -596,6 +607,19 @@ class SDP:
                     outer_list.append(inner_list)
                 self.table.append(outer_list)
 
+        # We are done with vector_types now so we can change it
+        for vec in vector_types:
+            for matrix in vec[0]:
+                for r in range(0, len(matrix)):
+                    for s in range(0, len(matrix)):
+                        quad = matrix[r][s]
+                        dim2 = dim_list[quad[2]]
+                        dim3 = dim_list[quad[3]]
+                        dim1 = dim2 + conv_table_list[quad[1]].delta_12
+                        dim4 = dim3 - conv_table_list[quad[1]].delta_34
+                        quad = [dim1, dim2, dim3, dim4]
+
+        self.dimension_set = vector_types
         self.bounds = [0.0] * len(self.table)
         self.options = []
 
@@ -1256,119 +1280,6 @@ class SDP:
 
         return components
 
-    def extremal_coefficients(self, dimensions, spin_irreps):
-        """
-        Once the full extremal spectrum is known, one can reconstruct the OPE
-        coefficients that cause those convolved conformal blocks to sum to the
-        `SDP`'s `unit`. This outputs a vector of squared OPE coefficients
-        determined in this way.
-
-        Parameters
-        ----------
-        dimensions:  A list of dimensions in the spectrum as returned by
-                     `extremal_dimensions`. However, it must be the union of such
-                     scaling dimensions over all possible `spin_irrep` inputs to
-                     `extremal_dimensions`.
-        spin_irreps: A list of ordered pairs of the type passed to
-                     `extremal_dimensions` used to label the spin and global
-                     symmetry representations of all operators that
-                     `extremal_dimensions` can find. This list must be in the same
-                     order used for `dimensions`.
-        """
-        # Builds an auxillary table to store the specific vectors in this sum rule
-        extremal_table = []
-        extremal_factors = []
-        zeros = min(len(dimensions), len(spin_irreps))
-        for i in range(0, zeros):
-            extremal_entry = []
-            l = self.get_table_index(spin_irreps[i])
-            size = len(self.table[l])
-            for j in range(0, len(self.unit)):
-                outer_list = []
-                for r in range(0, size):
-                    inner_list = []
-                    for s in range(0, size):
-                        inner_list.append(self.table[l][r][s].vector[j].subs(delta, dimensions[i]))
-                    outer_list.append(inner_list)
-                extremal_entry.append(outer_list)
-            extremal_table.append(extremal_entry)
-            extremal_factors.append(self.shifted_prefactor(self.table[l][0][0].poles, r_cross, dimensions[i], 0))
-
-        # Determines the crossing equations where OPE coefficients only enter diagonally
-        # We also demand that the equations be inhomogeneous
-        # This prevents some OPE coefficients from appearing (Z2-odd ones for example), so we must return to them
-        initial_rows = []
-        initial_coeffs = []
-        for i in range(0, len(self.unit)):
-            j = 0
-            involved_coeffs = []
-            good_row = (abs(self.unit[i]) > tiny)
-            while j < zeros and good_row == True:
-                size = len(extremal_table[j])
-                for r in range(0, size):
-                    for s in range(0, size):
-                        if abs(extremal_table[j][r][s]) > tiny:
-                            if r == s:
-                                involved_coeffs.append((j, r, s))
-                            else:
-                                good_row = False
-                j += 1
-            # See if new coefficients are brought in by this row
-            if good_row == True:
-                initial_rows.append(i)
-                for trip in involved_coeffs:
-                    if trip in initial_coeffs:
-                        continue
-                    initial_coeffs.append(trip)
-
-        # If there are more operators than crossing equations, we must remove those of highest dimension
-        if len(initial_coeffs) > len(initial_rows):
-            refine = True
-            kept_coeffs = []
-            new_dimensions = dimensions
-            new_spin_irreps = spin_irreps
-
-            while refine == True:
-                index_new = new_dimensions.index(min(new_dimensions))
-                # Allow for different operators of the same dimension
-                target_dimension = new_dimensions[index_new]
-                target_spin_irrep = new_spin_irreps[index_new]
-                for index_old in range(0, len(dimensions)):
-                    if abs(dimensions[index_old] - target_dimension) < tiny and spin_irreps[index_old] == target_spin_irrep:
-                        break
-                new_coeffs = []
-                for trip in initial_coeffs:
-                    if trip[0] == index_old:
-                        new_coeffs.append(trip)
-                if len(new_coeffs) + len(kept_coeffs) <= len(initial_rows):
-                    kept_coeffs = kept_coeffs + new_coeffs
-                    new_dimensions = new_dimensions[:index_new] + new_dimensions[index_new + 1:]
-                    new_spin_irreps = new_spin_irreps[:index_new] + new_spin_irreps[index_new + 1:]
-                    refine = (len(new_dimensions) > 0)
-                else:
-                    refine = False
-            initial_coeffs = kept_coeffs
-
-        # If there are more crossing equations than operators, we must omit the ones corresponding to high derivatives
-        # The last case might land us in this one as well if some OPE coefficients show up in pairs
-        if len(initial_rows) > len(initial_coeffs):
-            initial_rows = sorted(initial_rows, key = lambda i: self.m_order[i] + self.n_order[i])
-            initial_rows = initial_rows[:len(initial_coeffs)]
-
-        # Solve our system now that it is square
-        identity = []
-        extremal_blocks = []
-        zeros = len(initial_rows)
-        for i in initial_rows:
-            identity.append(self.unit[i])
-            for trip in initial_coeffs:
-                (j, r, s) = trip
-                extremal_blocks.append(float(extremal_table[j][r][s].vector[i] * extremal_factors[j]))
-        identity = DenseMatrix(zeros, 1, identity)
-        identity = identity.mul_scalar(self.shifted_prefactor(self.table[0][0][0].poles, r_cross, 0, 0))
-        extremal_matrix = DenseMatrix(zeros, zeros, extremal_blocks)
-        return extremal_matrix.solve(identity)
-
     def extremal_dimensions(self, functional, spin_irrep):
         """
         This finds the zeros of the resulting expression when a functional acts on
@@ -1415,3 +1326,198 @@ class SDP:
             if dim.imag > -1e-10 and dim.imag < 0.1 and dim.real > (bound - 0.01):
                 ret.append(dim.real)
         return ret
+
+    def extremal_coefficients(self, dimensions, spin_irreps):
+        """
+        Once the full extremal spectrum is known, one can reconstruct the OPE
+        coefficients that cause those convolved conformal blocks to sum to the
+        `SDP`'s `unit`. This outputs a vector of squared OPE coefficients
+        determined in this way.
+
+        Parameters
+        ----------
+        dimensions:  A list of dimensions in the spectrum as returned by
+                     `extremal_dimensions`. However, it must be the union of such
+                     scaling dimensions over all possible `spin_irrep` inputs to
+                     `extremal_dimensions`.
+        spin_irreps: A list of ordered pairs of the type passed to
+                     `extremal_dimensions` used to label the spin and global
+                     symmetry representations of all operators that
+                     `extremal_dimensions` can find. This list must be in the same
+                     order used for `dimensions`.
+        """
+        # Builds an auxillary table to store the specific vectors in this sum rule
+        extremal_table = []
+        extremal_factors = []
+        zeros = min(len(dimensions), len(spin_irreps))
+        for j in range(0, zeros):
+            extremal_entry = []
+            l = self.get_table_index(spin_irreps[j])
+            factor = self.shifted_prefactor(self.table[l][0][0].poles, r_cross, dimensions[j], 0)
+            size = len(self.table[l])
+            for i in range(0, len(self.unit)):
+                outer_list = []
+                for r in range(0, size):
+                    inner_list = []
+                    for s in range(0, size):
+                        inner_list.append(self.table[l][r][s].vector[i].subs(delta, dimensions[j]) * factor)
+                    outer_list.append(inner_list)
+                extremal_entry.append(outer_list)
+            extremal_table.append(extremal_entry)
+            extremal_factors.append(factor)
+
+        # Determines the crossing equations where OPE coefficients only enter diagonally
+        good_rows = []
+        for i in range(0, len(self.unit)):
+            j = 0
+            good_row = True
+            while j < zeros and good_row == True:
+                size = len(extremal_table[j])
+                for r in range(0, size):
+                    for s in range(0, size):
+                        if abs(extremal_table[j][r][s]) > tiny and r != s:
+                            good_row = False
+            if good_row == True:
+                good_rows.append(i)
+
+        fail = False
+        known_ops = []
+        # We go through the good rows, each time removing a chunk of them that uniformly include an OPE coefficient that is known
+        # On the first iteration, when we do not know any, we pull out the ones that are inhomogeneous due to the identity
+        while len(good_rows) > 0 and fail == False:
+            other_rows = []
+            current_rows = []
+            current_coeffs = []
+            new_dimensions = []
+            new_spin_irreps = []
+
+            current_target = [0, -1, -1]
+            for i in good_rows:
+                potential_coeffs = []
+                if len(known_ops) == 0 and abs(self.unit[i]) < tiny:
+                    other_rows.append(i)
+                elif len(known_ops) == 0:
+                    current_rows.append(i)
+                elif current_target[0] == 0:
+                    j = 0
+                    found = False
+                    while j < zeros and found == False:
+                        size = len(extremal_table[j])
+                        for vec in self.dimension_set:
+                            if vec[2] == spin_irreps[j][1]:
+                                break
+                        r = 0
+                        while r < size and found == False:
+                            dim_set1 = [vec[0][0][r][r][0], vec[0][0][r][r][1], dimensions[j]]
+                            dim_set1 = sorted(dim_set1)
+                            for c in known_coeffs:
+                                dim_set2 = [c[1], c[2], c[3]]
+                                dim_set2 = sorted(dim_set2)
+                                if abs(dim_set1[0] - dim_set2[0]) < 0.01 and abs(dim_set1[1] - dim_set2[1]) < 0.01  and abs(dim_set1[2] - dim_set2[2]) < 0.01:
+                                    # OPE coefficient symmetry only holds with a particular normalization
+                                    current_target = [(4.0 ** (dimensions[j] - c[3])) * c[0], j, r]
+                                    found = True
+                                    break
+                            r += 1
+                        j += 1
+                    if found == False:
+                        # This could happen if the SDP given to use does not correspond to the bootstrap of a physical theory
+                        print("Leads exhausted")
+                        fail = True
+                if current_target[0] != 0:
+                    j = current_target[1]
+                    r = current_target[2]
+                    if abs(extremal_table[j][r][r][i]) < tiny:
+                        other_rows.append(i)
+                    else:
+                        current_rows.append(i)
+            good_rows = other_rows
+
+            # Determine all the OPE coefficients that could possibly be solved using these rows
+            for i in current_rows:
+                for j in range(0, zeros):
+                    size = len(extremal_table[j])
+                    for r in range(0, size):
+                        if abs(extremal_table[j][r][r][i]) < tiny:
+                            continue
+                        if j == current_target[1] and r == current_target[2]:
+                            continue
+                        found_one = False
+                        found_both = False
+                        for c in current_coeffs:
+                            if c[0] == j and c[1] == r:
+                                found_one = True
+                                found_both = True
+                                break
+                            elif c[0] == j:
+                                found_one = True
+                        if found_both == False:
+                            current_coeffs.append((j, r))
+                        if found_one == False:
+                            new_dimensions.append(dimensions[j])
+                            new_spin_irreps.append(spin_irreps[j])
+
+            # If there are more operators than crossing equations, we must remove those of highest dimension
+            if len(current_coeffs) > len(current_rows):
+                refine = True
+                kept_coeffs = []
+
+                while refine == True:
+                    index_new = new_dimensions.index(min(new_dimensions))
+                    # Allow for different operators of the same dimension
+                    target_dimension = new_dimensions[index_new]
+                    target_spin_irrep = new_spin_irreps[index_new]
+                    for index_old in range(0, len(dimensions)):
+                        if abs(dimensions[index_old] - target_dimension) < tiny and spin_irreps[index_old] == target_spin_irrep:
+                            break
+                    new_coeffs = []
+                    for pair in current_coeffs:
+                        if pair[0] == index_old:
+                            new_coeffs.append(pair)
+                    if len(new_coeffs) + len(kept_coeffs) <= len(current_rows):
+                        kept_coeffs = kept_coeffs + new_coeffs
+                        new_dimensions = new_dimensions[:index_new] + new_dimensions[index_new + 1:]
+                        new_spin_irreps = new_spin_irreps[:index_new] + new_spin_irreps[index_new + 1:]
+                        refine = (len(new_dimensions) > 0)
+                    else:
+                        refine = False
+                current_coeffs = kept_coeffs
+
+            # If there are more crossing equations than operators, we must omit the ones corresponding to high derivatives
+            # The last case might land us in this one as well if some OPE coefficients show up in pairs
+            if len(current_rows) > len(current_coeffs):
+                current_rows = sorted(current_rows, key = lambda i: self.m_order[i] + self.n_order[i])
+                current_rows = current_rows[:len(current_coeffs)]
+
+            # Solve our system now that it is square
+            identity = []
+            extremal_blocks = []
+            size = len(current_rows)
+            if current_target[0] == 0:
+                factor = self.shifted_prefactor(self.table[0][0][0].poles, r_cross, 0, 0) * (-1)
+            else:
+                factor = extremal_factors[current_target[1]] * (-1)
+            for i in current_rows:
+                if current_target[0] == 0:
+                    identity.append(self.unit[i])
+                else:
+                    identity.append(extremal_table[j_id][r_id][r_id][i])
+                for pair in current_coeffs:
+                    (j, r) = pair
+                    extremal_blocks.append(float(extremal_table[j][r][r][i]))
+            identity = DenseMatrix(size, 1, identity)
+            identity = identity.mul_scalar(factor)
+            extremal_matrix = DenseMatrix(size, size, extremal_blocks)
+            solution = extremal_matrix.solve(identity)
+
+            # Add these coefficients, along with other things we know, to the list of operators
+            for i in range(0, len(current_coeffs)):
+                (j, r) = current_coeffs[i]
+                ope_coeff = solution.get(i, 0)
+                for vec in self.dimension_set:
+                    if vec[2] == spin_irreps[j][1]:
+                        break
+                dim1 = vec[0][0][r][r][0]
+                dim2 = vec[0][0][r][r][1]
+                known_ops.append([ope_coeff, dim1, dim2, dimensions[j], spin_irreps[j]])
+        return known_ops
