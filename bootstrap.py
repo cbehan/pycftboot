@@ -1171,19 +1171,14 @@ class SDP:
                     any ".xml" at the end. Defaults to "mySDP".
         """
         l = self.get_table_index(spin_irrep)
-
-        prod1 = 1
-        prod2 = -1
-        for p in self.table[0][0][0].poles:
-            prod1 *= -p
-        for p in self.table[l][0][0].poles:
-            prod2 *= (dimension - p)
+        prod1 = self.shifted_prefactor(self.table[0][0][0].poles, r_cross, 0, 0)
+        prod2 = self.shifted_prefactor(self.table[l][0][0].poles, r_cross, dimension, 0) * (-1)
 
         obj = []
         norm = []
         for i in range(0, len(self.unit)):
             norm.append(self.table[l][0][0].vector[i].subs(delta, dimension))
-            obj.append(self.unit[i] / prod1)
+            obj.append(self.unit[i] * prod1)
         functional = self.solution_functional(self.get_bound(spin_irrep), spin_irrep, obj, norm, name)
 
         out_file = open(name + ".out", 'r')
@@ -1210,7 +1205,7 @@ class SDP:
 
         eigenvalues = numpy.linalg.eigvalsh(outer_list)
         bound = float(primal_value) / min(eigenvalues)
-        return bound * prod2 / (r_cross ** dimension)
+        return bound / prod2
 
     def solution_functional(self, dimension, spin_irrep, obj = None, norm = None, name = "mySDP"):
         """
@@ -1282,6 +1277,7 @@ class SDP:
         """
         # Builds an auxillary table to store the specific vectors in this sum rule
         extremal_table = []
+        extremal_factors = []
         zeros = min(len(dimensions), len(spin_irreps))
         for i in range(0, zeros):
             extremal_entry = []
@@ -1296,6 +1292,7 @@ class SDP:
                     outer_list.append(inner_list)
                 extremal_entry.append(outer_list)
             extremal_table.append(extremal_entry)
+            extremal_factors.append(self.shifted_prefactor(self.table[l][0][0].poles, r_cross, dimensions[i], 0))
 
         # Determines the crossing equations where OPE coefficients only enter diagonally
         # We also demand that the equations be inhomogeneous
@@ -1358,7 +1355,7 @@ class SDP:
             initial_rows = sorted(initial_rows, key = lambda i: self.m_order[i] + self.n_order[i])
             initial_rows = initial_rows[:len(initial_coeffs)]
 
-        # Solve our system now that it is square      
+        # Solve our system now that it is square
         identity = []
         extremal_blocks = []
         zeros = len(initial_rows)
@@ -1366,8 +1363,9 @@ class SDP:
             identity.append(self.unit[i])
             for trip in initial_coeffs:
                 (j, r, s) = trip
-                extremal_blocks.append(float(extremal_table[j][r][s].vector[i]))
+                extremal_blocks.append(float(extremal_table[j][r][s].vector[i] * extremal_factors[j]))
         identity = DenseMatrix(zeros, 1, identity)
+        identity = identity.mul_scalar(self.shifted_prefactor(self.table[0][0][0].poles, r_cross, 0, 0))
         extremal_matrix = DenseMatrix(zeros, zeros, extremal_blocks)
         return extremal_matrix.solve(identity)
 
