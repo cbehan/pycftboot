@@ -504,8 +504,10 @@ class SDP:
                      blocks are normalized under the convention that all OPE
                      coefficients involving the identity are 1. It should not be
                      necessary to change this.
-    dimension_set:   A copy of `vector_types` but with the entries changed at the
-                     innermost level. The ordered quadruples do not correspond to
+    irrep_set:       A list of ordered pairs, one for each type of operator in
+                     `vector_types`. The second element of each is a label for the
+                     representation. The first is a modified version of the first
+                     matrix. The ordered quadruples do not correspond to the
                      prefactors and list positions anymore but to the four external
                      operator dimensions that couple to the block in this position.
                      It should not be necessary to change this.
@@ -543,6 +545,7 @@ class SDP:
         self.n_order = []
         self.table = []
         self.unit = []
+        self.irrep_set = []
 
         # Turn any "raw elements" from the vectorial sum rule into 1x1 matrices
         for i in range(0, len(vector_types)):
@@ -609,17 +612,17 @@ class SDP:
 
         # We are done with vector_types now so we can change it
         for vec in vector_types:
-            for matrix in vec[0]:
-                for r in range(0, len(matrix)):
-                    for s in range(0, len(matrix)):
-                        quad = matrix[r][s]
-                        dim2 = dim_list[quad[2]]
-                        dim3 = dim_list[quad[3]]
-                        dim1 = dim2 + conv_table_list[quad[1]].delta_12
-                        dim4 = dim3 - conv_table_list[quad[1]].delta_34
-                        quad = [dim1, dim2, dim3, dim4]
+            matrix = vec[0][0]
+            for r in range(0, len(matrix)):
+                for s in range(0, len(matrix)):
+                    quad = matrix[r][s]
+                    dim2 = dim_list[quad[2]]
+                    dim3 = dim_list[quad[3]]
+                    dim1 = dim2 + conv_table_list[quad[1]].delta_12
+                    dim4 = dim3 - conv_table_list[quad[1]].delta_34
+                    quad = [dim1, dim2, dim3, dim4]
+            self.irrep_set.append([matrix, vec[2]])
 
-        self.dimension_set = vector_types
         self.bounds = [0.0] * len(self.table)
         self.options = []
 
@@ -1403,8 +1406,8 @@ class SDP:
                     found = False
                     while j < zeros and found == False:
                         size = len(extremal_table[j])
-                        for vec in self.dimension_set:
-                            if vec[2] == spin_irreps[j][1]:
+                        for vec in self.irrep_set:
+                            if vec[1] == spin_irreps[j][1]:
                                 break
                         r = 0
                         while r < size and found == False:
@@ -1496,7 +1499,9 @@ class SDP:
             if current_target[0] == 0:
                 factor = self.shifted_prefactor(self.table[0][0][0].poles, r_cross, 0, 0) * (-1)
             else:
-                factor = extremal_factors[current_target[1]] * (-1)
+                factor = 1
+                j_id = current_target[1]
+                r_id = current_target[2]
             for i in current_rows:
                 if current_target[0] == 0:
                     identity.append(self.unit[i])
@@ -1514,10 +1519,10 @@ class SDP:
             for i in range(0, len(current_coeffs)):
                 (j, r) = current_coeffs[i]
                 ope_coeff = solution.get(i, 0)
-                for vec in self.dimension_set:
-                    if vec[2] == spin_irreps[j][1]:
+                for vec in self.irrep_set:
+                    if vec[1] == spin_irreps[j][1]:
                         break
-                dim1 = vec[0][0][r][r][0]
-                dim2 = vec[0][0][r][r][1]
+                dim1 = vec[0][r][r][0]
+                dim2 = vec[0][r][r][1]
                 known_ops.append([ope_coeff, dim1, dim2, dimensions[j], spin_irreps[j]])
         return known_ops
