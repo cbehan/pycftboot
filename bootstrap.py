@@ -620,7 +620,7 @@ class SDP:
                     dim3 = dim_list[quad[3]]
                     dim1 = dim2 + conv_table_list[quad[1]].delta_12
                     dim4 = dim3 - conv_table_list[quad[1]].delta_34
-                    quad = [dim1, dim2, dim3, dim4]
+                    matrix[r][s] = [dim1, dim2, dim3, dim4]
             self.irrep_set.append([matrix, vec[2]])
 
         self.bounds = [0.0] * len(self.table)
@@ -1354,19 +1354,21 @@ class SDP:
         extremal_factors = []
         zeros = min(len(dimensions), len(spin_irreps))
         for j in range(0, zeros):
-            extremal_entry = []
+            if type(spin_irreps[j]) == type(1):
+                spin_irreps[j] = [spin_irreps[j], 0]
             l = self.get_table_index(spin_irreps[j])
             factor = self.shifted_prefactor(self.table[l][0][0].poles, r_cross, dimensions[j], 0)
             size = len(self.table[l])
-            for i in range(0, len(self.unit)):
-                outer_list = []
-                for r in range(0, size):
-                    inner_list = []
-                    for s in range(0, size):
-                        inner_list.append(self.table[l][r][s].vector[i].subs(delta, dimensions[j]) * factor)
-                    outer_list.append(inner_list)
-                extremal_entry.append(outer_list)
-            extremal_table.append(extremal_entry)
+            outer_list = []
+            for r in range(0, size):
+                inner_list = []
+                for s in range(0, size):
+                    extremal_entry = []
+                    for i in range(0, len(self.unit)):
+                        extremal_entry.append(self.table[l][r][s].vector[i].subs(delta, dimensions[j]) * factor)
+                    inner_list.append(extremal_entry)
+                outer_list.append(inner_list)
+            extremal_table.append(outer_list)
             extremal_factors.append(factor)
 
         # Determines the crossing equations where OPE coefficients only enter diagonally
@@ -1378,8 +1380,9 @@ class SDP:
                 size = len(extremal_table[j])
                 for r in range(0, size):
                     for s in range(0, size):
-                        if abs(extremal_table[j][r][s]) > tiny and r != s:
+                        if abs(extremal_table[j][r][s][i]) > tiny and r != s:
                             good_row = False
+                j += 1
             if good_row == True:
                 good_rows.append(i)
 
@@ -1424,7 +1427,7 @@ class SDP:
                             r += 1
                         j += 1
                     if found == False:
-                        # This could happen if the SDP given to use does not correspond to the bootstrap of a physical theory
+                        # This could happen if the SDP given to us does not correspond to the bootstrap of a physical theory
                         print("Leads exhausted")
                         fail = True
                 if current_target[0] != 0:
