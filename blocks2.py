@@ -42,11 +42,11 @@ def cancel_poles(polynomial_vector):
     poles = []
     zero_poles = []
     for p in polynomial_vector.poles:
-        if abs(p) > tiny:
+        if abs(float(p)) > tiny:
             poles.append(p)
         else:
             zero_poles.append(p)
-        poles = zero_poles + poles
+    poles = zero_poles + poles
 
     for p in poles:
         # We should really make sure the pole is a root of all numerators
@@ -99,18 +99,25 @@ class ConformalBlockTableSeed2:
         pole_set = []
         conformal_blocks = []
         nu = eval_mpfr((dim / Integer(2)) - 1, prec)
+        c_2 = (ell * (ell + 2 * nu) + delta * (delta - 2 * nu - 2)) / 2
+        c_4 = ell * (ell + 2 * nu) * (delta - 1) * (delta - 2 * nu - 1)
         delta_prod = delta_12 * delta_34 / (eval_mpfr(-2, prec))
         delta_sum = (delta_12 - delta_34) / (eval_mpfr(-2, prec))
+        if delta_12 == 0 and delta_34 == 0:
+            effective_power = 2
+        else:
+            effective_power = 1
 
         for l in range(0, l_max + 1, step):
             poles = []
-            for k in range(1, k_max + 1):
+            for k in range(effective_power, k_max + 1, effective_power):
                 poles.append(eval_mpfr(1 - k - l, prec))
                 poles.append((2 + 2 * nu - k) / eval_mpfr(2, prec))
                 poles.append(1 - k + l + 2 * nu)
             pole_set.append(poles)
 
-        for l in range(0, l_max + 1, step):
+        l = 0
+        while l <= l_max and effective_power == 1:
             frob_coeffs = [1]
             conformal_blocks.append([])
             self.table.append(PolynomialVector([], [l, 0], pole_set[l // step]))
@@ -182,6 +189,53 @@ class ConformalBlockTableSeed2:
                     conformal_blocks[l // step][m] += prod * frob_coeffs[k] * (r_cross ** (k - m))
                     conformal_blocks[l // step][m] = conformal_blocks[l // step][m].expand()
                     prod *= (delta + k - m)
+            l += step
+
+        l = 0
+        while l <= l_max and effective_power == 2:
+            frob_coeffs = [1]
+            conformal_blocks.append([])
+            self.table.append(PolynomialVector([], [l, 0], pole_set[l // step]))
+
+            for k in range(2, k_max + 1, 2):
+                recursion_coeffs = [0, 0, 0]
+                recursion_coeffs[0] += 3 * c_4 + 2 * c_2 * (2 * nu - 3)
+                recursion_coeffs[0] += 2 * (delta + k - 2) * (2 * nu - 1) * (c_2 + 2 * nu - 2)
+                recursion_coeffs[0] += 2 * (delta + k - 2) * (delta + k - 3) * (10 - 7 * nu - 2 * nu * nu - 3 * c_2)
+                recursion_coeffs[0] += 2 * (delta + k - 2) * (delta + k - 3) * (delta + k - 4) * (7 - 2 * nu)
+                recursion_coeffs[0] += 3 * (delta + k - 2) * (delta + k - 3) * (delta + k - 4) * (delta + k - 5)
+                recursion_coeffs[1] += 2 * c_2 * (3 - 2 * nu) - 3 * c_4
+                recursion_coeffs[1] += 2 * (delta + k - 4) * (c_2 * (2 * nu + 5) + 8 * nu * nu - 4 * nu - 12)
+                recursion_coeffs[1] += 2 * (delta + k - 4) * (delta + k - 5) * (3 * c_2 + 2 * nu * nu - 5 * nu - 22)
+                recursion_coeffs[1] -= 2 * (delta + k - 4) * (delta + k - 5) * (delta + k - 6) * (2 * nu + 11)
+                recursion_coeffs[1] -= 3 * (delta + k - 4) * (delta + k - 5) * (delta + k - 6) * (delta + k - 7)
+                recursion_coeffs[2] = (k + 2 * nu - 4) * (2 * delta + k - 6) * (delta + k - l - 5) * (delta + k + l + 2 * nu - 5)
+                recursion_coeffs[1] = recursion_coeffs[1].subs(ell, l)
+                recursion_coeffs[0] = recursion_coeffs[0].subs(ell, l)
+
+                pole_prod = 1
+                frob_coeffs.append(0)
+                for i in range(0, min(k / 2, 3)):
+                    frob_coeffs[k / 2] += recursion_coeffs[i] * pole_prod * frob_coeffs[(k / 2) - i - 1] / eval_mpfr(2 * k, prec)
+                    frob_coeffs[k / 2] = frob_coeffs[k / 2].expand()
+                    if i + 1 < min(k / 2, 3):
+                        pole_prod *= (delta - pole_set[l // step][3 * ((k / 2) - i - 2)]) * (delta - pole_set[l // step][3 * ((k / 2) - i - 2) + 1]) * (delta - pole_set[l // step][3 * ((k / 2) - i - 2) + 2])
+
+            pole_prod = 1
+            for k in range(k_max // 2, -1, -1):
+                frob_coeffs[k] *= pole_prod
+                frob_coeffs[k] = frob_coeffs[k].expand()
+                if k > 0:
+                    pole_prod *= (delta - pole_set[l // step][3 * k - 1]) * (delta - pole_set[l // step][3 * k - 2]) * (delta - pole_set[l // step][3 * k - 3])
+
+            conformal_blocks[l // step] = [0] * (m_max + 1)
+            for k in range(0, (k_max // 2) + 1):
+                prod = 1
+                for m in range(0, m_max + 1):
+                    conformal_blocks[l // step][m] += prod * frob_coeffs[k] * (r_cross ** (2 * k - m))
+                    conformal_blocks[l // step][m] = conformal_blocks[l // step][m].expand()
+                    prod *= (delta + 2 * k - m)
+            l += step
 
         (rules1, rules2, self.m_order, self.n_order) = rules(m_max, 0)
         chain_rule_single(self.m_order, rules1, self.table, conformal_blocks, lambda l, i: conformal_blocks[l][i])
