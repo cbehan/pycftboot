@@ -660,12 +660,9 @@ class SDP:
         if dimension != -1:
             self.points.append((spin_irrep, dimension))
         else:
-            i = 0
-            while i < len(self.points):
-                if self.points[i][0] == spin_irrep:
-                    self.points = self.points[:i] + self.points[i + 1:]
-                else:
-                    i += 1
+            for p in points:
+                if p[0] == spin_irrep:
+                    self.points.remove(p)
 
     def get_bound(self, gapped_spin_irrep):
         """
@@ -1482,8 +1479,8 @@ class SDP:
                             new_coeffs.append(pair)
                     if len(new_coeffs) + len(kept_coeffs) <= len(current_rows):
                         kept_coeffs = kept_coeffs + new_coeffs
-                        new_dimensions = new_dimensions[:index_new] + new_dimensions[index_new + 1:]
-                        new_spin_irreps = new_spin_irreps[:index_new] + new_spin_irreps[index_new + 1:]
+                        new_dimensions.remove(target_dimension)
+                        new_spin_irreps.remove(target_spin_irrep)
                         refine = (len(new_dimensions) > 0)
                     else:
                         refine = False
