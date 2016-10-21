@@ -1136,7 +1136,7 @@ class SDP:
 
         return terminate_reason == '"found primal feasible solution";\n'
 
-    def bisect(self, lower, upper, threshold, spin_irrep):
+    def bisect(self, lower, upper, threshold, spin_irrep, bias = None):
         """
         Uses a binary search to find the maximum allowed gap in a particular type
         of operator before the CFT stops existing. The allowed value closest to the
@@ -1150,12 +1150,39 @@ class SDP:
         spin_irrep: An ordered pair of the type passed to `set_bound`. Used to
                     label the spin and representation of the operator whose
                     dimension is being bounded.
+        bias:       [Optional] The ratio between the expected time needed to rule
+                    out a CFT and the expected time needed to conclude that it
+                    cannot be. Defaults to `None` which means that this will be
+                    measured as the binary search progresses.
         """
+        x = 0.5
+        d_time = 0
+        p_time = 0
+        bias_found = False
         checkpoints = False
         old = self.get_bound(spin_irrep)
+        if bias != None:
+            bias = min(bias, 1.0 / bias)
+            bias_found = True
 
         while abs(upper - lower) > threshold:
-            test = (lower + upper) / 2.0
+            if bias == None and d_time != 0 and p_time != 0:
+                bias = p_time / d_time
+            if bias != None and bias_found == False:
+                # Bisection within a bisection
+                u = 0.5
+                l = 0.0
+                while abs(u - l) > 0.01:
+                    x = (u + l) / 2.0
+                    frac = log((x ** x) * ((1 - x) ** (1 - x))) / log(x / (1 - x))
+                    test = (frac - x) / (frac - x + 1)
+                    if test > bias:
+                        u = x
+                    else:
+                        l = x
+                bias_found = True
+
+            test = lower + x * (upper - lower)
             print("Trying " + test.__str__())
             self.set_bound(spin_irrep, test)
 
@@ -1171,8 +1198,10 @@ class SDP:
 
             if result == False:
                 upper = test
+                d_time = end - start
             else:
                 lower = test
+                p_time = end - start
 
         self.set_bound(spin_irrep, old)
         return lower
