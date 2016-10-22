@@ -612,7 +612,7 @@ class SDP:
 
         # We are done with vector_types now so we can change it
         for vec in vector_types:
-            matrix = vec[0][0]
+            matrix = deepcopy(vec[0][0])
             for r in range(0, len(matrix)):
                 for s in range(0, len(matrix)):
                     quad = matrix[r][s]
