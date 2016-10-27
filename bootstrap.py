@@ -1377,7 +1377,6 @@ class SDP:
         """
         # Builds an auxillary table to store the specific vectors in this sum rule
         extremal_table = []
-        extremal_factors = []
         zeros = min(len(dimensions), len(spin_irreps))
         for j in range(0, zeros):
             if type(spin_irreps[j]) == type(1):
@@ -1395,7 +1394,6 @@ class SDP:
                     inner_list.append(extremal_entry)
                 outer_list.append(inner_list)
             extremal_table.append(outer_list)
-            extremal_factors.append(factor)
 
         # Determines the crossing equations where OPE coefficients only enter diagonally
         good_rows = []
