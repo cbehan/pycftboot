@@ -991,6 +991,7 @@ class SDP:
         laguerre_points = []
         laguerre_degrees = []
         extra_vectors = []
+        degree_sum = 0
 
         # Handle discretely added points
         for p in self.points:
@@ -1108,6 +1109,11 @@ class SDP:
             matrix_node.appendChild(sample_scaling_node)
             matrix_node.appendChild(bilinear_basis_node)
             matrices_node.appendChild(matrix_node)
+            degree_sum += degree + 1
+
+        # Recognize an SDP that looks overdetermined
+        if degree_sum < len(self.unit):
+            print("Crossing equations have too many derivative components")
 
         self.table = self.table[:len(self.bounds)]
         xml_file = open(name + ".xml", 'w')
