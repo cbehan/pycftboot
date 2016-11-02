@@ -1512,8 +1512,8 @@ class SDP:
                             new_coeffs.append(pair)
                     if len(new_coeffs) + len(kept_coeffs) <= len(current_rows):
                         kept_coeffs = kept_coeffs + new_coeffs
-                        new_dimensions.remove(target_dimension)
-                        new_spin_irreps.remove(target_spin_irrep)
+                        new_dimensions = new_dimensions[:index_new] + new_dimensions[index_new + 1:]
+                        new_spin_irreps = new_spin_irreps[:index_new] + new_spin_irreps[index_new + 1:]
                         refine = (len(new_dimensions) > 0)
                     else:
                         refine = False
