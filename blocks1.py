@@ -137,9 +137,13 @@ class ConformalBlockVector:
         nu = (dim / Integer(2)) - 1
         old_list = MeromorphicBlockVector(leading_block)
         for k in range(0, len(pol_list)):
-            pole = delta_pole(nu, pol_list[k][1], l, pol_list[k][3])
+            max_component = 0
+            for j in range(0, len(leading_block.chunks)):
+                for n in range(0, leading_block.chunks[j].nrows()):
+                    max_component = max(max_component, abs(float(res_list[k].chunks[j].get(n, 0))))
 
-            if abs(float(res_list[k].chunks[0].get(0, 0))) < cutoff:
+            pole = delta_pole(nu, pol_list[k][1], l, pol_list[k][3])
+            if max_component < cutoff:
                 self.small_poles.append(pole)
             else:
                 self.large_poles.append(pole)
