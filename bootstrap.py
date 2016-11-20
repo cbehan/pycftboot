@@ -660,7 +660,7 @@ class SDP:
         if dimension != -1:
             self.points.append((spin_irrep, dimension))
         else:
-            for p in points:
+            for p in self.points:
                 if p[0] == spin_irrep:
                     self.points.remove(p)
 
