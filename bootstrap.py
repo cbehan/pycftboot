@@ -1362,7 +1362,7 @@ class SDP:
                 ret.append(dim.real)
         return ret
 
-    def extremal_coefficients(self, dimensions, spin_irreps):
+    def extremal_coefficients(self, dimensions, spin_irreps, nullity = 1):
         """
         Once the full extremal spectrum is known, one can reconstruct the OPE
         coefficients that cause those convolved conformal blocks to sum to the
@@ -1380,6 +1380,10 @@ class SDP:
                      symmetry representations of all operators that
                      `extremal_dimensions` can find. This list must be in the same
                      order used for `dimensions`.
+        nullity:     [Optional] The number of extra equations to use beyond the
+                     number of unknown variables. If this is non-zero, a positivity
+                     constraint will be placed on the optimal OPE coefficients.
+                     Defaults to 1.
         """
         # Builds an auxillary table to store the specific vectors in this sum rule
         extremal_table = []
@@ -1446,7 +1450,7 @@ class SDP:
                         while r < size and found == False:
                             dim_set1 = [vec[0][0][r][r][0], vec[0][0][r][r][1], dimensions[j]]
                             dim_set1 = sorted(dim_set1)
-                            for c in known_coeffs:
+                            for c in known_ops:
                                 dim_set2 = [c[1], c[2], c[3]]
                                 dim_set2 = sorted(dim_set2)
                                 if abs(dim_set1[0] - dim_set2[0]) < 0.01 and abs(dim_set1[1] - dim_set2[1]) < 0.01  and abs(dim_set1[2] - dim_set2[2]) < 0.01:
@@ -1494,7 +1498,7 @@ class SDP:
                             new_spin_irreps.append(spin_irreps[j])
 
             # If there are more operators than crossing equations, we must remove those of highest dimension
-            if len(current_coeffs) > len(current_rows):
+            if len(current_coeffs) + nullity > len(current_rows):
                 refine = True
                 kept_coeffs = []
 
@@ -1510,7 +1514,7 @@ class SDP:
                     for pair in current_coeffs:
                         if pair[0] == index_old:
                             new_coeffs.append(pair)
-                    if len(new_coeffs) + len(kept_coeffs) <= len(current_rows):
+                    if len(new_coeffs) + len(kept_coeffs) + nullity <= len(current_rows):
                         kept_coeffs = kept_coeffs + new_coeffs
                         new_dimensions = new_dimensions[:index_new] + new_dimensions[index_new + 1:]
                         new_spin_irreps = new_spin_irreps[:index_new] + new_spin_irreps[index_new + 1:]
@@ -1521,14 +1525,14 @@ class SDP:
 
             # If there are more crossing equations than operators, we must omit the ones corresponding to high derivatives
             # The last case might land us in this one as well if some OPE coefficients show up in pairs
-            if len(current_rows) > len(current_coeffs):
+            if len(current_rows) > len(current_coeffs) + nullity:
                 current_rows = sorted(current_rows, key = lambda i: self.m_order[i] + self.n_order[i])
-                current_rows = current_rows[:len(current_coeffs)]
+                current_rows = current_rows[:len(current_coeffs) + nullity]
 
             # Solve our system now that it is square
             identity = []
             extremal_blocks = []
-            size = len(current_rows)
+            size = len(current_coeffs)
             if current_target[0] == 0:
                 factor = self.shifted_prefactor(self.table[0][0][0].poles, r_cross, 0, 0) * (-1)
             else:
@@ -1543,9 +1547,9 @@ class SDP:
                 for pair in current_coeffs:
                     (j, r) = pair
                     extremal_blocks.append(float(extremal_table[j][r][r][i]))
-            identity = DenseMatrix(size, 1, identity)
+            identity = DenseMatrix(size + nullity, 1, identity)
             identity = identity.mul_scalar(factor)
-            extremal_matrix = DenseMatrix(size, size, extremal_blocks)
+            extremal_matrix = DenseMatrix(size + nullity, size, extremal_blocks)
             solution = extremal_matrix.solve(identity)
 
             # Add these coefficients, along with other things we know, to the list of operators
