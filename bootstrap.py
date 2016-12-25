@@ -1121,6 +1121,30 @@ class SDP:
         xml_file.close()
         doc.unlink()
 
+    def read_output(self, name = "mySDP"):
+        """
+        Reads an `SDPB` output file and returns a dictionary in which all entries
+        have been converted to their respective Python types.
+
+        Parameters
+        ----------
+        name:       [Optional] The name of the file without any ".out" at the end.
+                    Defaults to "mySDP".
+        """
+        ret = {}
+        out_file = open(name + ".out", 'r')
+        for line in out_file:
+            (key, delimiter, value) = line.partition(" = ")
+            value = value.replace('\n', '')
+            value = value.replace(';', '')
+            value = value.replace('{', '[')
+            value = value.replace('}', ']')
+            value = re.sub("([0-9]+\.[0-9]+e?-?[0-9]+)", r"eval_mpfr(\1, prec)", value)
+            command = "ret['" + key + "'] = " + value
+            exec(command)
+        out_file.close()
+        return ret
+
     def iterate(self, name = "mySDP"):
         """
         Returns `True` if this `SDP` with its current gaps represents an allowed CFT
@@ -1135,12 +1159,10 @@ class SDP:
         self.write_xml(obj, self.unit, name)
 
         os.spawnvp(os.P_WAIT, sdpb_path, ["sdpb", "-s", name + ".xml", "--precision=" + str(prec), "--findPrimalFeasible", "--findDualFeasible", "--noFinalCheckpoint"] + self.options)
-        out_file = open(name + ".out", 'r')
-        terminate_line = next(out_file)
-        terminate_reason = terminate_line.partition(" = ")[-1]
-        out_file.close()
+        output = self.read_output(name = name)
 
-        return terminate_reason == '"found primal feasible solution";\n'
+        terminate_reason = output["terminateReason"]
+        return terminate_reason == "found primal feasible solution"
 
     def bisect(self, lower, upper, threshold, spin_irrep, bias = None):
         """
@@ -1239,12 +1261,8 @@ class SDP:
             norm.append(self.table[l][0][0].vector[i].subs(delta, dimension))
             obj.append(self.unit[i] * prod1)
         functional = self.solution_functional(self.get_bound(spin_irrep), spin_irrep, obj, norm, name)
-
-        out_file = open(name + ".out", 'r')
-        next(out_file)
-        primal_line = next(out_file)
-        primal_value = primal_line.partition(" = ")[-1][:-2]
-        out_file.close()
+        output = self.read_output(name = name)
+        primal_value = output["primalObjective"]
 
         # This primal value will be divided by 1 or something different if the matrix is not 1x1
         size = len(self.table[l])
@@ -1301,19 +1319,8 @@ class SDP:
         self.set_bound(spin_irrep, old)
 
         os.spawnvp(os.P_WAIT, sdpb_path, ["sdpb", "-s", name + ".xml", "--precision=" + str(prec), "--noFinalCheckpoint"] + self.options)
-        out_file = open(name + ".out", 'r')
-        for i in range(0, 7):
-            next(out_file)
-        y_line = next(out_file)
-        y_line = y_line.partition(" = ")[-1][1:-3]
-
-        component_strings = y_line.split(", ")
-        components = [eval_mpfr(1.0, prec)]
-        for num in component_strings:
-            command = "components.append(eval_mpfr(" + num + ", prec))"
-            exec(command)
-
-        return components
+        output = self.read_output(name = name)
+        return [eval_mpfr(1.0, prec)] + output["y"]
 
     def extremal_dimensions(self, functional, spin_irrep):
         """
