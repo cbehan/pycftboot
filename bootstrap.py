@@ -1557,7 +1557,10 @@ class SDP:
             identity = DenseMatrix(size + nullity, 1, identity)
             identity = identity.mul_scalar(factor)
             extremal_matrix = DenseMatrix(size + nullity, size, extremal_blocks)
-            solution = extremal_matrix.solve(identity)
+            if nullity == 0:
+                solution = extremal_matrix.solve(identity)
+            else:
+                solution = self.least_absolute_distance(extremal_matrix, identity)
 
             # Add these coefficients, along with other things we know, to the list of operators
             for i in range(0, len(current_coeffs)):
@@ -1570,3 +1573,119 @@ class SDP:
                 dim2 = vec[0][r][r][1]
                 known_ops.append([ope_coeff, dim1, dim2, dimensions[j], spin_irreps[j]])
         return known_ops
+
+    def least_absolute_distance(self, matrix, vector):
+        """
+        This returns the vector which is closest in the 1-norm to being a solution
+        of an inhomogeneous linear system. It is convenient to overload `SDPB` as a
+        linear program solver here.
+
+        Parameters
+        ----------
+        matrix: A matrix having more rows than columns.
+        vector: A vector whose length is the row dimension of `matrix`.
+        """
+        zeros = matrix.ncols()
+        nullity = matrix.nrows() - zeros
+
+        # The initial zero is the b_0 ignored by SDPB
+        obj = [0]
+        for i in range(0, zeros + nullity):
+            obj.append(-1)
+        for i in range(0, zeros):
+            obj.append(0)
+
+        constraint_vector = []
+        for i in range(0, zeros + nullity):
+            constraint_vector.append(vector.get(i, 0))
+        for i in range(0, zeros + nullity):
+            constraint_vector.append(vector.get(i, 0) * (-1))
+
+        constraint_matrix = []
+        for i in range(0, 2 * (zeros + nullity)):
+            constraint_matrix.append([0] * (2 * zeros + nullity))
+        for i in range(0, zeros + nullity):
+            constraint_matrix[i][i] = -1
+            constraint_matrix[zeros + nullity + i][i] = -1
+        for i in range(0, zeros + nullity):
+            for j in range(0, zeros):
+                constraint_matrix[i][zeros + nullity + j] = matrix.get(i, j)
+                constraint_matrix[zeros + nullity + i][zeros + nullity + j] = matrix.get(i, j) * (-1)
+
+        # To solve this with scipy, one could stop here
+        #return linprog(obj, constraint_matrix, constraint_vector)
+
+        extra = []
+        for i in range(0, 2 * zeros + nullity):
+            extra.append([0] * (2 * zeros + nullity))
+        for i in range(0, 2 * zeros + nullity):
+            extra[i][i] = -1
+        constraint_matrix = extra + constraint_matrix
+        constraint_vector = [0] * (2 * zeros + nullity) + constraint_vector
+
+        # Now that the functional components are positive, make a toy XML file
+        doc = xml.dom.minidom.Document()
+        root_node = doc.createElement("sdp")
+        objective_node = doc.createElement("objective")
+        matrices_node = doc.createElement("polynomialVectorMatrices")
+        doc.appendChild(root_node)
+        root_node.appendChild(objective_node)
+        root_node.appendChild(matrices_node)
+
+        for n in range(0, len(obj)):
+            elt_node = doc.createElement("elt")
+            elt_node.appendChild(doc.createTextNode(self.short_string(obj[n])))
+            objective_node.appendChild(elt_node)
+
+        for j in range(0, len(constraint_vector)):
+            matrix_node = doc.createElement("polynomialVectorMatrix")
+            rows_node = doc.createElement("rows")
+            cols_node = doc.createElement("cols")
+            elements_node = doc.createElement("elements")
+            vector_node = doc.createElement("polynomialVector")
+            sample_point_node = doc.createElement("samplePoints")
+            sample_scaling_node = doc.createElement("sampleScalings")
+            bilinear_basis_node = doc.createElement("bilinearBasis")
+            rows_node.appendChild(doc.createTextNode("1"))
+            cols_node.appendChild(doc.createTextNode("1"))
+
+            block = [constraint_vector[j] * (-1)] + constraint_matrix[j]
+            for n in range(0, len(block)):
+                polynomial_node = doc.createElement("polynomial")
+                coeff_node = doc.createElement("coeff")
+                coeff_node.appendChild(doc.createTextNode(self.short_string(block[n] * (-1))))
+                polynomial_node.appendChild(coeff_node)
+                vector_node.appendChild(polynomial_node)
+            elements_node.appendChild(vector_node)
+
+            elt_node = doc.createElement("elt")
+            elt_node.appendChild(doc.createTextNode("1"))
+            sample_point_node.appendChild(elt_node)
+            elt_node = doc.createElement("elt")
+            elt_node.appendChild(doc.createTextNode("1"))
+            sample_scaling_node.appendChild(elt_node)
+            polynomial_node = doc.createElement("polynomial")
+            coeff_node = doc.createElement("coeff")
+            coeff_node.appendChild(doc.createTextNode("1"))
+            polynomial_node.appendChild(coeff_node)
+            bilinear_basis_node.appendChild(polynomial_node)
+
+            matrix_node.appendChild(rows_node)
+            matrix_node.appendChild(cols_node)
+            matrix_node.appendChild(elements_node)
+            matrix_node.appendChild(sample_point_node)
+            matrix_node.appendChild(sample_scaling_node)
+            matrix_node.appendChild(bilinear_basis_node)
+            matrices_node.appendChild(matrix_node)
+
+        xml_file = open("tmp.xml", 'w')
+        doc.writexml(xml_file, addindent = "    ", newl = '\n')
+        xml_file.close()
+        doc.unlink()
+
+        # SDPB should now run quickly with default options
+        os.spawnvp(os.P_WAIT, sdpb_path, ["sdpb", "-s", "tmp.xml", "--noFinalCheckpoint"])
+        output = self.read_output(name = "tmp")
+        solution = output["y"]
+        solution = solution[zeros + nullity:]
+        return DenseMatrix(zeros, 1, solution)
