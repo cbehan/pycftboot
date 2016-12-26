@@ -1597,91 +1597,45 @@ class SDP:
 
         constraint_vector = []
         for i in range(0, zeros + nullity):
-            constraint_vector.append(vector.get(i, 0))
-        for i in range(0, zeros + nullity):
             constraint_vector.append(vector.get(i, 0) * (-1))
+        for i in range(0, zeros + nullity):
+            constraint_vector.append(vector.get(i, 0))
 
         constraint_matrix = []
         for i in range(0, 2 * (zeros + nullity)):
-            constraint_matrix.append([0] * (2 * zeros + nullity))
+            constraint_matrix.append([eval_mpfr(0, prec)] * (2 * zeros + nullity))
         for i in range(0, zeros + nullity):
-            constraint_matrix[i][i] = -1
-            constraint_matrix[zeros + nullity + i][i] = -1
+            constraint_matrix[i][i] = eval_mpfr(1, prec)
+            constraint_matrix[zeros + nullity + i][i] = eval_mpfr(1, prec)
         for i in range(0, zeros + nullity):
             for j in range(0, zeros):
-                constraint_matrix[i][zeros + nullity + j] = matrix.get(i, j)
-                constraint_matrix[zeros + nullity + i][zeros + nullity + j] = matrix.get(i, j) * (-1)
+                constraint_matrix[i][zeros + nullity + j] = matrix.get(i, j) * (-1)
+                constraint_matrix[zeros + nullity + i][zeros + nullity + j] = matrix.get(i, j)
 
         # To solve this with scipy, one could stop here
-        #return linprog(obj, constraint_matrix, constraint_vector)
+        #return linprog(-obj[1:], -constraint_matrix, -constraint_vector)
 
         extra = []
         for i in range(0, 2 * zeros + nullity):
-            extra.append([0] * (2 * zeros + nullity))
+            extra.append([eval_mpfr(0, prec)] * (2 * zeros + nullity))
         for i in range(0, 2 * zeros + nullity):
-            extra[i][i] = -1
+            extra[i][i] = eval_mpfr(1, prec)
         constraint_matrix = extra + constraint_matrix
-        constraint_vector = [0] * (2 * zeros + nullity) + constraint_vector
+        constraint_vector = [eval_mpfr(0, prec)] * (2 * zeros + nullity) + constraint_vector
 
-        # Now that the functional components are positive, make a toy XML file
-        doc = xml.dom.minidom.Document()
-        root_node = doc.createElement("sdp")
-        objective_node = doc.createElement("objective")
-        matrices_node = doc.createElement("polynomialVectorMatrices")
-        doc.appendChild(root_node)
-        root_node.appendChild(objective_node)
-        root_node.appendChild(matrices_node)
+        # Now that the functional components are positive, make a toy SDP for this
+        aux_table1 = ConformalBlockTable(1, 0, 0, 0, 0)
+        aux_table2 = ConvolvedBlockTable(aux_table1)
+        aux_sdp = SDP(0, aux_table2)
+        aux_sdp.bounds = [0] * len(constraint_vector)
+        aux_sdp.basis = [mpmath.matrix([[1]])] * len(constraint_vector)
+        for i in range(0, len(constraint_vector)):
+            block = [constraint_vector[i]] + constraint_matrix[i]
+            aux_sdp.table.append([[PolynomialVector(block, [0, 0], [])]])
 
-        for n in range(0, len(obj)):
-            elt_node = doc.createElement("elt")
-            elt_node.appendChild(doc.createTextNode(self.short_string(obj[n])))
-            objective_node.appendChild(elt_node)
-
-        for j in range(0, len(constraint_vector)):
-            matrix_node = doc.createElement("polynomialVectorMatrix")
-            rows_node = doc.createElement("rows")
-            cols_node = doc.createElement("cols")
-            elements_node = doc.createElement("elements")
-            vector_node = doc.createElement("polynomialVector")
-            sample_point_node = doc.createElement("samplePoints")
-            sample_scaling_node = doc.createElement("sampleScalings")
-            bilinear_basis_node = doc.createElement("bilinearBasis")
-            rows_node.appendChild(doc.createTextNode("1"))
-            cols_node.appendChild(doc.createTextNode("1"))
-
-            block = [constraint_vector[j] * (-1)] + constraint_matrix[j]
-            for n in range(0, len(block)):
-                polynomial_node = doc.createElement("polynomial")
-                coeff_node = doc.createElement("coeff")
-                coeff_node.appendChild(doc.createTextNode(self.short_string(block[n] * (-1))))
-                polynomial_node.appendChild(coeff_node)
-                vector_node.appendChild(polynomial_node)
-            elements_node.appendChild(vector_node)
-
-            elt_node = doc.createElement("elt")
-            elt_node.appendChild(doc.createTextNode("1"))
-            sample_point_node.appendChild(elt_node)
-            elt_node = doc.createElement("elt")
-            elt_node.appendChild(doc.createTextNode("1"))
-            sample_scaling_node.appendChild(elt_node)
-            polynomial_node = doc.createElement("polynomial")
-            coeff_node = doc.createElement("coeff")
-            coeff_node.appendChild(doc.createTextNode("1"))
-            polynomial_node.appendChild(coeff_node)
-            bilinear_basis_node.appendChild(polynomial_node)
-
-            matrix_node.appendChild(rows_node)
-            matrix_node.appendChild(cols_node)
-            matrix_node.appendChild(elements_node)
-            matrix_node.appendChild(sample_point_node)
-            matrix_node.appendChild(sample_scaling_node)
-            matrix_node.appendChild(bilinear_basis_node)
-            matrices_node.appendChild(matrix_node)
-
-        xml_file = open("tmp.xml", 'w')
-        doc.writexml(xml_file, addindent = "    ", newl = '\n')
-        xml_file.close()
-        doc.unlink()
+        norm = [0] * len(obj)
+        norm[0] = -1
+        aux_sdp.write_xml(obj, norm, name = "tmp")
 
         # SDPB should now run quickly with default options
         os.spawnvp(os.P_WAIT, sdpb_path, ["sdpb", "-s", "tmp.xml", "--noFinalCheckpoint"])
