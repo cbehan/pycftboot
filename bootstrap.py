@@ -1358,6 +1358,8 @@ class SDP:
         matrix = DenseMatrix(size, size, entries)
         determinant = matrix.det().expand()
         coeffs = coefficients(determinant)
+        for i in range(0, len(coeffs)):
+            coeffs[i] = float(coeffs[i])
         poly = numpy.polynomial.Polynomial(coeffs)
         roots = poly.roots()
 
