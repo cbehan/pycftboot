@@ -595,6 +595,7 @@ class SDP:
                     inner_list = []
                     for s in range(0, size):
                         derivatives = []
+                        large_poles = []
                         for matrix in vec[0]:
                             quad = matrix[r][s]
                             tab = conv_table_list[quad[1]]
@@ -603,10 +604,12 @@ class SDP:
                                 index = l
                             else:
                                 index = l // 2
+                            if quad[0] != 0:
+                                large_poles = tab.table[index].poles
 
                             for i in range(0, len(tab.table[index].vector)):
                                 derivatives.append(quad[0] * tab.table[index].vector[i].subs(delta_ext, (dim_list[quad[2]] + dim_list[quad[3]]) / 2.0))
-                        inner_list.append(PolynomialVector(derivatives, [l, vec[2]], tab.table[index].poles))
+                        inner_list.append(PolynomialVector(derivatives, [l, vec[2]], large_poles))
                     outer_list.append(inner_list)
                 self.table.append(outer_list)
 
