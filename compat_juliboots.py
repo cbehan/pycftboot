@@ -40,13 +40,13 @@ def juliboots_read(block_table, name):
         for i in range(0, comp):
             poly = 0
             for k in range(0, degree + 1):
-                exec("coeff = eval_mpfr(" + next(tab_file)[:-1] + ", prec)")
+                coeff = RealMPFR(next(tab_file)[:-1], prec)
                 poly += coeff * (delta ** k)
             derivatives.append(poly.expand())
 
         single_poles = [0] * int(next(tab_file))
         for p in range(0, len(single_poles)):
-            exec("single_poles[p] = eval_mpfr(" + next(tab_file)[:-1] + ", prec)")
+            single_poles[p] = RealMPFR(next(tab_file)[:-1], prec)
 
         # We add coeff / (delta - p) summed over all poles
         # This just puts it over a common denominator automatically
@@ -54,7 +54,7 @@ def juliboots_read(block_table, name):
             prod1 = 1
             single_pole_term = 0
             for p in single_poles:
-                exec("coeff = eval_mpfr(" + next(tab_file)[:-1] + ", prec)")
+                coeff = RealMPFR(next(tab_file)[:-1], prec)
                 single_pole_term = single_pole_term * (delta - p) + coeff * prod1
                 single_pole_term = single_pole_term.expand()
                 prod1 *= (delta - p)
@@ -64,7 +64,7 @@ def juliboots_read(block_table, name):
 
         double_poles = [0] * int(next(tab_file))
         for p in range(0, len(double_poles)):
-            exec("double_poles[p] = eval_mpfr(" + next(tab_file)[:-1] + ", prec)")
+            double_poles[p] = RealMPFR(next(tab_file)[:-1], prec)
 
         # Doing this for double poles is the same if we remember to square everything
         # We also need the product of single poles to come in at the end
@@ -72,7 +72,7 @@ def juliboots_read(block_table, name):
             prod2 = 1
             double_pole_term = 0
             for p in double_poles:
-                exec("coeff = eval_mpfr(" + next(tab_file)[:-1] + ", prec)")
+                coeff = RealMPFR(next(tab_file)[:-1], prec)
                 double_pole_term = double_pole_term * ((delta - p) ** 2) + coeff * prod2
                 double_pole_term = double_pole_term.expand()
                 prod2 *= (delta - p) ** 2

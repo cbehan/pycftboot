@@ -2,7 +2,7 @@ cutoff = 0
 prec = 660
 dec_prec = int((3.0 / 10.0) * prec)
 mpmath.mp.dps = dec_prec
-exec("tiny = eval_mpfr(1e-" + str(dec_prec // 2) + ", prec)")
+tiny = RealMPFR("1e-" + str(dec_prec // 2), prec)
 
 rho_cross = 3 - 2 * mpmath.sqrt(2)
 r_cross = eval_mpfr(3 - 2 * sqrt(2), prec)
@@ -131,7 +131,7 @@ def dump_table_contents(block_table, name):
         dump_file.write("derivatives = []\n")
         for i in range(0, len(block_table.table[0].vector)):
             poly_string = block_table.table[l].vector[i].__str__()
-            poly_string = re.sub("([0-9]+\.[0-9]+e?-?[0-9]+)", r"eval_mpfr(\1, prec)", poly_string)
+            poly_string = re.sub("([0-9]+\.[0-9]+e?-?[0-9]+)", r"RealMPFR('\1', prec)", poly_string)
             dump_file.write("derivatives.append(" + poly_string + ")\n")
         dump_file.write("self.table.append(PolynomialVector(derivatives, " + block_table.table[l].label.__str__() + ", " + block_table.table[l].poles.__str__() + "))\n")
 
