@@ -32,6 +32,7 @@ if have_mpfr == False:
 # Relocate some self-contained classes to separate files
 # Importing them would not make sense because they refer back to things in this file
 exec(open("common.py").read())
+exec(open("compat_juliboots.py").read())
 exec(open("blocks1.py").read())
 exec(open("blocks2.py").read())
 
@@ -86,8 +87,11 @@ class ConformalBlockTable:
     odd_spins: [Optional] Whether to include 0, 1, 2, 3, ..., `l_max` instead of
                just 0, 2, 4, ..., `l_max`. Defaults to `False`.
     name:      [Optional] The name of a file containing conformal blocks that have
-               already been calculated. If this is specified, all other parameters
-               passed to the class are overwritten by the ones in the table.
+               already been calculated. If this is specified and refers to a file
+               produced by PyCFTBoot, all other parameters passed to the class are
+               overwritten by the ones in the table. If it refers to one produced
+               by JuliBoots, all parameters passed to the class except delta_12 and
+               delta_34 are overwritten.
 
     Attributes
     ----------
@@ -117,8 +121,16 @@ class ConformalBlockTable:
 
         if name != None:
             dump_file = open(name, 'r')
-            command = dump_file.read()
-            exec(command)
+            token = next(dump_file)[:4]
+            dump_file.close()
+
+            if token == "self":
+                dump_file = open(name, 'r')
+                command = dump_file.read()
+                exec(command)
+                dump_file.close()
+            else:
+                juliboots_read(self, name)
             return
 
         if dim % 2 == 0:
