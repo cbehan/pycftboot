@@ -160,30 +160,42 @@ class ConformalBlockVector:
 
         for j in range(0, len(leading_block.chunks)):
             self.chunks.append(leading_block.chunks[j])
-            for p in self.large_poles:
-                self.chunks[j] = self.chunks[j].mul_scalar(delta - p)
 
-        for k in range(0, len(pol_list)):
-            pole = delta_pole(nu, pol_list[k][1], l, pol_list[k][3])
+        for p in self.small_poles:
+            vector = []
+            for i in range(0, len(self.large_poles) // 2):
+                vector.append(1 / ((unitarity_bound(dim, l) - p) ** (i + 1)))
+            for i in range(0, len(self.large_poles) - (len(self.large_poles) // 2)):
+                vector.append(1 / (((1 / cutoff) - p) ** (i + 1)))
+            vector = DenseMatrix(len(self.large_poles), 1, vector)
+            vector = matrix.solve(vector)
 
-            if pole in self.large_poles:
+            k1 = self.get_pole_index(nu, l, pol_list, p)
+            for i in range(0, len(self.large_poles)):
+                k2 = self.get_pole_index(nu, l, pol_list, self.large_poles[i])
                 for j in range(0, len(self.chunks)):
-                    self.chunks[j] = self.chunks[j].add_matrix(res_list[k].chunks[j].mul_scalar(omit_all(self.large_poles, [pole], delta)))
-            else:
-                vector = []
-                for i in range(0, len(self.large_poles) // 2):
-                    vector.append(1 / ((unitarity_bound(dim, l) - pole) ** (i + 1)))
-                for i in range(0, len(self.large_poles) - (len(self.large_poles) // 2)):
-                    vector.append(1 / (((1 / cutoff) - pole) ** (i + 1)))
-                vector = DenseMatrix(len(self.large_poles), 1, vector)
-                vector = matrix.solve(vector)
-                for i in range(0, len(self.large_poles)):
-                    for j in range(0, len(self.chunks)):
-                        self.chunks[j] = self.chunks[j].add_matrix(res_list[k].chunks[j].mul_scalar(vector.get(i, 0) * omit_all(self.large_poles, [self.large_poles[i]], delta)))
+                    res_list[k2].chunks[j] = res_list[k2].chunks[j].add_matrix(res_list[k1].chunks[j].mul_scalar(vector.get(i, 0)))
+
+        prod = 1
+        for p in self.large_poles:
+            k = self.get_pole_index(nu, l, pol_list, p)
+            for j in range(0, len(self.chunks)):
+                self.chunks[j] = self.chunks[j].mul_scalar(delta - p).add_matrix(res_list[k].chunks[j].mul_scalar(prod))
+                for i in range(0, self.chunks[j].nrows()):
+                    self.chunks[j].set(i, 0, self.chunks[j].get(i, 0).expand())
+            prod *= delta - p
+            prod = prod.expand()
 
         for j in range(0, len(self.chunks)):
             s_sub = s_matrix[0:derivative_order - j + 1, 0:derivative_order - j + 1]
             self.chunks[j] = s_sub.mul_matrix(self.chunks[j])
+
+    def get_pole_index(self, nu, l, pol_list, p):
+        for k in range(0, len(pol_list)):
+            pole = delta_pole(nu, pol_list[k][1], l, pol_list[k][3])
+            if abs(float(pole - p)) < tiny:
+                return k
+        return -1
 
 class ConformalBlockTableSeed:
     """
