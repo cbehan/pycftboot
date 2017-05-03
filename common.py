@@ -86,6 +86,18 @@ def coefficients(polynomial):
             ret.append(0)
     return ret
 
+def build_polynomial(coefficients):
+    """
+    Returns a polynomial in `delta` from a list of coefficients. The first one is
+    expected to be the constant term.
+    """
+    ret = 0
+    prod = 1
+    for d in range(0, len(coefficients)):
+        ret += coefficients[d] * prod
+        prod *= delta
+    return ret
+
 def unitarity_bound(dim, spin):
     """
     Returns the lower bound for conformal dimensions in a unitary theory for a

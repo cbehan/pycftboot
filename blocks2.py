@@ -65,11 +65,7 @@ def cancel_poles(polynomial_vector):
                     coeffs.remove(coeffs[0])
                     new_coeffs = coeffs
 
-                prod = 1
-                polynomial_vector.vector[n] = 0
-                for i in range(0, len(new_coeffs)):
-                    polynomial_vector.vector[n] += prod * new_coeffs[i]
-                    prod *= delta
+                polynomial_vector.vector[n] = build_polynomial(new_coeffs)
 
 class ConformalBlockTableSeed2:
     """

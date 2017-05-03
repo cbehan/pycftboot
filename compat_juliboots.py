@@ -120,19 +120,13 @@ def juliboots_write(block_table, name):
             max_degree = max(max_degree, degree - len(block_table.table[l].poles))
         tab_file.write(str(max_degree + 1) + "\n")
 
-        series = 0
-        coeffs = [1] + [0] * max_degree
+        series = 1
         for p in block_table.table[l].poles:
-            new_coeffs = []
-            old_coeffs = list(coeffs)
-            for k in range(0, max_degree + 1):
-                new_coeffs.append(p ** k)
-            for k in range(0, max_degree + 1):
-                coeffs[k] = 0
-                for j in range(0, k + 1):
-                    coeffs[k] += old_coeffs[j] * new_coeffs[k - j]
-        for k in range(0, max_degree + 1):
-            series += coeffs[k] * (delta ** k)
+            term = build_polynomial([1] * (max_degree + 1))
+            term = term.subs(delta, p * delta)
+            series *= term
+            series = series.expand()
+            series = build_polynomial(coefficients(series)[:max_degree + 1])
 
         # Above, delta functions as 1 / delta
         # We need to multiply by the numerator with reversed coefficients to get the entire part
@@ -140,9 +134,7 @@ def juliboots_write(block_table, name):
             poly = block_table.table[l].vector[i]
             coeff_list = coefficients(poly)
             coeff_list.reverse()
-            poly = 0
-            for k in range(0, len(coeff_list)):
-                poly += coeff_list[k] * (delta ** k)
+            poly = build_polynomial(coeff_list)
             poly = poly * series
             poly = poly.expand()
             coeff_list = coefficients(poly)
