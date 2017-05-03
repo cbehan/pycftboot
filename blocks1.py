@@ -345,5 +345,8 @@ class ConformalBlockTableSeed:
         else:
             chain_rule_double(self.m_order, self.n_order, rules1, rules2, self.table, conformal_blocks)
 
-    def dump(self, name):
-        dump_table_contents(self, name)
+    def dump(self, name, form = None):
+        if form == "juliboots":
+            juliboots_write(self, name)
+        else:
+            dump_table_contents(self, name)

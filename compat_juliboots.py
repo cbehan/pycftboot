@@ -85,3 +85,112 @@ def juliboots_read(block_table, name):
         block_table.table.append(PolynomialVector(derivatives, [l, 0], poles))
         block_table.k_max = len(poles)
     tab_file.close()
+
+def juliboots_write(block_table, name):
+    """
+    This writes out a block table in the format expected by JuliBoots. It is
+    triggered when a `ConformalBlockTable` is dumped with the right format string.
+    """
+    tab_file = open(name, 'w')
+    tab_file.write(str((block_table.dim / Integer(2)) - 1) + "\n")
+    tab_file.write(str(block_table.n_max) + "\n")
+    tab_file.write(str(block_table.m_max) + "\n")
+    tab_file.write(str(block_table.l_max) + "\n")
+
+    alternate = 1
+    if block_table.odd_spins:
+        tab_file.write("1\n")
+    else:
+        tab_file.write("0\n")
+    tab_file.write(str(prec) + "\n")
+    tab_file.write(str(len(block_table.table[0].vector)) + "\n")
+
+    # Print delta_12 or delta_34 when we get the chance
+    # If the file is going to have unused bits, we might as well use them
+    for l in range(0, len(block_table.table)):
+        if alternate == 1:
+            tab_file.write(str(block_table.delta_12) + "\n")
+        else:
+            tab_file.write(str(block_table.delta_34) + "\n")
+
+        max_degree = 0
+        for poly in block_table.table[l].vector:
+            coeff_list = sorted(poly.args, key = extract_power)
+            degree = extract_power(coeff_list[-1])
+            max_degree = max(max_degree, degree - len(block_table.table[l].poles))
+        tab_file.write(str(max_degree + 1) + "\n")
+
+        series = 0
+        coeffs = [1] + [0] * max_degree
+        for p in block_table.table[l].poles:
+            new_coeffs = []
+            old_coeffs = list(coeffs)
+            for k in range(0, max_degree + 1):
+                new_coeffs.append(p ** k)
+            for k in range(0, max_degree + 1):
+                coeffs[k] = 0
+                for j in range(0, k + 1):
+                    coeffs[k] += old_coeffs[j] * new_coeffs[k - j]
+        for k in range(0, max_degree + 1):
+            series += coeffs[k] * (delta ** k)
+
+        # Above, delta functions as 1 / delta
+        # We need to multiply by the numerator with reversed coefficients to get the entire part
+        for i in range(0, len(block_table.table[l].vector)):
+            poly = block_table.table[l].vector[i]
+            coeff_list = coefficients(poly)
+            coeff_list.reverse()
+            poly = 0
+            for k in range(0, len(coeff_list)):
+                poly += coeff_list[k] * (delta ** k)
+            poly = poly * series
+            poly = poly.expand()
+            coeff_list = coefficients(poly)
+            # We get the numerator degree by subtracting the degree of series
+            # The difference between this and the number of poles is the degree of the polynomial we write
+            degree = len(coeff_list) - max_degree - len(block_table.table[l].poles) - 1
+            factor = eval_mpfr(2, prec) ** (block_table.m_order[i] + 2 * block_table.n_order[i])
+            for k in range(0, max_degree + 1):
+                index = degree - k
+                if index >= 0:
+                    tab_file.write(str(factor * coeff_list[index]) + "\n")
+                else:
+                    tab_file.write("0\n")
+
+        single_poles = []
+        double_poles = []
+        for p in block_table.table[l].poles:
+            if p in single_poles:
+                single_poles.remove(p)
+                double_poles.append(p)
+            else:
+                single_poles.append(p)
+
+        # The single pole part of the partial fraction decomposition is easier
+        tab_file.write(str(len(single_poles)) + "\n")
+        for p in single_poles:
+            tab_file.write(str(p) + "\n")
+
+        for i in range(0, len(block_table.table[l].vector)):
+            poly = block_table.table[l].vector[i]
+            factor = eval_mpfr(2, prec) ** (block_table.m_order[i] + 2 * block_table.n_order[i])
+            for p in single_poles:
+                num = poly.subs(delta, p)
+                denom = omit_all(block_table.table[l].poles, [p], p)
+                tab_file.write(str(factor * num / denom) + "\n")
+
+        # The double pole part is identical
+        tab_file.write(str(len(double_poles)) + "\n")
+        for p in double_poles:
+            tab_file.write(str(p) + "\n")
+
+        for i in range(0, len(block_table.table[l].vector)):
+            poly = block_table.table[l].vector[i]
+            factor = eval_mpfr(2, prec) ** (block_table.m_order[i] + 2 * block_table.n_order[i])
+            for p in double_poles:
+                num = poly.subs(delta, p)
+                denom = omit_all(block_table.table[l].poles, [p], p)
+                tab_file.write(str(factor * num / denom) + "\n")
+
+        alternate *= -1
+    tab_file.close()

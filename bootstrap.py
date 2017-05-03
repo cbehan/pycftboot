@@ -252,16 +252,23 @@ class ConformalBlockTable:
                 self.n_order.append(n)
                 index += 1
 
-    def dump(self, name):
+    def dump(self, name, form = None):
         """
-        Saves a table of conformal block derivatives to a file. The file is valid
-        Python code which manually populates the entries of `table` when executed.
+        Saves a table of conformal block derivatives to a file. Unless overridden,
+        the file is valid Python code which manually populates the entries of
+        `table` when executed.
 
         Parameters
         ----------
         name: The path to use for output.
+        form: [Optional] A string indicating that the file should be saved in
+              another program's format if it is equal to "juliboots". Any other
+              value will be ignored. Defaults to `None`.
         """
-        dump_table_contents(self, name)
+        if form == "juliboots":
+            juliboots_write(self, name)
+        else:
+            dump_table_contents(self, name)
 
 class ConvolvedBlockTable:
     """

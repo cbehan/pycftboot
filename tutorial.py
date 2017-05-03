@@ -35,7 +35,7 @@ if choice == 1:
     k_max = 20
     # Says that conformal blocks for spin-0 up to and including spin-14 should be computed.
     l_max = 14
-    # Conformal blocks are functions of (a, b) and as many derivatives of each should be kept for strong bounds.
+    # Conformal blocks are functions of (a, b) and many derivatives of each should be kept for strong bounds.
     # This says to keep derivatives up to fourth order in b.
     n_max = 4
     # For a given n, this states how many a derivatives should be included beyond 2 * (n - n_max).
@@ -46,7 +46,7 @@ if choice == 1:
     table2 = bootstrap.ConvolvedBlockTable(table1)
     # Sets up a semidefinite program that we can use to study this.
     sdp = bootstrap.SDP(dim_phi, table2)
-    # We think it is perfectly find for all internal scalars coupling to our external one to have dimension above 0.7.
+    # We think it is perfectly fine for all internal scalars coupling to our external one to have dimension above 0.7.
     lower = 0.7
     # Conversely, we think it is a problem for crossing symmetry if they all have dimension above 1.7.
     upper = 1.7
