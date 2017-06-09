@@ -1213,7 +1213,6 @@ class SDP:
         old = self.get_bound(spin_irrep)
         if bias != None:
             bias = min(bias, 1.0 / bias)
-            bias_found = True
 
         while abs(upper - lower) > threshold:
             if bias == None and d_time != 0 and p_time != 0:
