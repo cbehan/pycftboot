@@ -132,9 +132,9 @@ class ConformalBlockTable:
                     dump_file.close()
                 else:
                     juliboots_read(self, name)
-                    return
+                return
             except:
-                print("table "+name+"  not present, generating another")
+                print("Table " + name + " not present, generating another")
 
         if dim % 2 == 0:
             small_table = ConformalBlockTableSeed2(dim, k_max, l_max, min(m_max + 2 * n_max, 3), delta_12, delta_34, odd_spins)
