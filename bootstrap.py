@@ -1273,7 +1273,10 @@ class SDP:
                 p_time = end - start
 
         self.set_bound(spin_irrep, old)
-        return lower
+        if reverse == False:
+            return lower
+        else:
+            return upper
 
     def opemax(self, dimension, spin_irrep, name = "mySDP"):
         """
