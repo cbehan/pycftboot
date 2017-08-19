@@ -1189,7 +1189,7 @@ class SDP:
         terminate_reason = output["terminateReason"]
         return terminate_reason == "found primal feasible solution"
 
-    def bisect(self, lower, upper, threshold, spin_irrep, bias = None):
+    def bisect(self, lower, upper, threshold, spin_irrep, isolated = False, reverse = False, bias = None):
         """
         Uses a binary search to find the maximum allowed gap in a particular type
         of operator before the CFT stops existing. The allowed value closest to the
@@ -1203,6 +1203,12 @@ class SDP:
         spin_irrep: An ordered pair of the type passed to `set_bound`. Used to
                     label the spin and representation of the operator whose
                     dimension is being bounded.
+        isolated:   [Optional] Whether to bisect the position of an isolated
+                    operator rather than the gap where the continuum starts.
+                    Defaults to `False`.
+        reverse:    [Optional] Whether we are looking for a lower bound instead of
+                    an upper bound. This should only be used when `isolated` is
+                    `True`. Defaults to `False`.
         bias:       [Optional] The ratio between the expected time needed to rule
                     out a CFT and the expected time needed to conclude that it
                     cannot be. Defaults to `None` which means that this will be
@@ -1236,7 +1242,10 @@ class SDP:
 
             test = lower + x * (upper - lower)
             print("Trying " + test.__str__())
-            self.set_bound(spin_irrep, test)
+            if isolated == True:
+                self.add_point(spin_irrep, test)
+            else:
+                self.set_bound(spin_irrep, test)
 
             # Using the same name twice in a row is only dangerous if the runs are really long
             start = time.time()
@@ -1247,12 +1256,20 @@ class SDP:
             end = time.time()
             if int(end - start) > int(self.get_option("checkpointInterval")):
                 checkpoints = True
+            if isolated == True:
+                self.points = self.points[:-1]
 
             if result == False:
-                upper = test
+                if reverse == False:
+                    upper = test
+                else:
+                    lower = test
                 d_time = end - start
             else:
-                lower = test
+                if reverse == False:
+                    lower = test
+                else:
+                    upper = test
                 p_time = end - start
 
         self.set_bound(spin_irrep, old)
