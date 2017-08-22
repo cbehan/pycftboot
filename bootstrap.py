@@ -1165,7 +1165,7 @@ class SDP:
             value = value.replace('{', '[')
             value = value.replace('}', ']')
             value = re.sub("([0-9]+\.[0-9]+e?-?[0-9]+)", r"RealMPFR('\1', prec)", value)
-            command = "ret['" + key + "'] = " + value
+            command = "ret['" + key.strip() + "'] = " + value
             exec(command)
         out_file.close()
         return ret
