@@ -660,7 +660,7 @@ class SDP:
                 self.basis.append(mat)
             self.set_bound(reset_basis = False)
 
-    def add_point(self, spin_irrep = -1, dimension = -1):
+    def add_point(self, spin_irrep = -1, dimension = -1, extra = []):
         """
         Tells the `SDP` that a particular fixed operator should be included in the
         sum rule. If called with one argument, all points with that label will be
@@ -675,6 +675,20 @@ class SDP:
                     Defaults to -1 which means all operators.
         dimension:  [Optional] The scaling dimension of the operator being added.
                     Defaults to -1 which means the point should be removed.
+        extra:      [Optional] A list of quintuples specifying information about
+                    other operators that should be packaged with this operator. The
+                    first two elements of a quintuple are the `spin_irrep` and
+                    `dimension` except for the operator which is not being added
+                    separately because its presence is tied to this one. The next
+                    two elements of a quintuple are ordered pairs giving positions
+                    in the crossing equation matrices. The operator described by the
+                    first two quintuple elements should have its contribution in the
+                    position given by the first ordered pair added to that of the
+                    operator described by `spin_irrep` and `dimension` in the
+                    position given by the second ordered pair. The final element of
+                    the quintuple is a coefficient that should multiply whatever is
+                    added. The purpose of this is to enforce OPE coefficient
+                    relations as in arXiv:1603.04436.
         """
         if spin_irrep == -1:
             self.points = []
@@ -683,7 +697,7 @@ class SDP:
         if type(spin_irrep) == type(1):
             spin_irrep = [spin_irrep, 0]
         if dimension != -1:
-            self.points.append((spin_irrep, dimension))
+            self.points.append((spin_irrep, dimension, extra))
         else:
             for p in self.points:
                 if p[0] == spin_irrep:
@@ -1029,7 +1043,18 @@ class SDP:
                 for s in range(0, size):
                     new_vector = []
                     for i in range(0, len(self.table[l][r][s].vector)):
-                        new_vector.append(self.table[l][r][s].vector[i].subs(delta, p[1]))
+                        addition = self.table[l][r][s].vector[i].subs(delta, p[1])
+                        for quint in p[2]:
+                            if quint[3][0] != r or quint[3][1] != s:
+                                continue
+                            l_new = self.get_table_index(quint[0])
+                            r_new = quint[2][0]
+                            s_new = quint[2][1]
+                            coeff = quint[4]
+                            coeff *= self.shifted_prefactor(self.table[l_new][0][0].poles, r_cross, quint[1], 0)
+                            coeff /= self.shifted_prefactor(self.table[l][0][0].poles, r_cross, p[1], 0)
+                            addition += coeff * self.table[l_new][r_new][s_new].vector[i].subs(delta, quint[1])
+                        new_vector.append(addition)
                     inner_list.append(PolynomialVector(new_vector, p[0], self.table[l][r][s].poles))
                 outer_list.append(inner_list)
             extra_vectors.append(outer_list)
