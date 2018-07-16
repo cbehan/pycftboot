@@ -603,13 +603,16 @@ class SDP:
 
         # Looping over types and spins gives "0 - S", "0 - T", "1 - A" and so on
         for vec in vector_types:
-            if (vec[1] % 2) == 1:
+            # Instead of specifying even or odd spins, the user can specify a list of spins
+            if type(vec[1]) == type([]):
+                spin_list = vec[1]
+            elif (vec[1] % 2) == 1:
                 self.odd_spins = True
-                start = 1
+                spin_list = range(1, self.l_max, 2)
             else:
-                start = 0
+                spin_list = range(0, self.l_max, 2)
 
-            for l in range(start, self.l_max, 2):
+            for l in spin_list:
                 size = len(vec[0][0])
 
                 outer_list = []
