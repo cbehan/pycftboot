@@ -330,7 +330,7 @@ class ConvolvedBlockTable:
     n_order:     A list stating how many `b` derivatives are being described by the
                  corresponding entry in a `PolynomialVector` in `table`.
     """
-    def __init__(self, block_table, odd_spins = True, symmetric = False, content = [[1, 0, 0]]):
+    def __init__(self, block_table, odd_spins = True, symmetric = False, spins = [], content = [[1, 0, 0]]):
         # Copying everything but the unconvolved table is fine from a memory standpoint
         self.dim = block_table.dim
         self.k_max = block_table.k_max
@@ -358,6 +358,12 @@ class ConvolvedBlockTable:
             step = 1
         else:
             step = 2
+        if len(spins) > 0:
+            spin_list = spins
+        elif self.odd_spins:
+            spin_list = range(0, self.l_max + 1, 1)
+        else:
+            spin_list = range(0, self.l_max + 1, 2)
 
         symbol_array = []
         for n in range(0, block_table.n_max + 1):
@@ -388,9 +394,8 @@ class ConvolvedBlockTable:
                 deriv = expression / (factorial(m) * factorial(n))
                 derivatives.append(deriv)
 
-        spin = 0
         combined_block_table = []
-        while spin <= self.l_max:
+        for spin in spin_list:
             vector = []
             l = spin // step
 
@@ -431,12 +436,7 @@ class ConvolvedBlockTable:
                                 coeff *= delta - p
                         entry += coeff * block_table.table[l + ell_shift].vector[i].subs(delta, delta + del_shift)
                 vector.append(entry.expand())
-
             combined_block_table.append(PolynomialVector(vector, [spin, 0], all_poles))
-            if self.odd_spins:
-                spin += 1
-            else:
-                spin += 2
 
         for l in range(0, len(combined_block_table)):
             new_derivs = []
