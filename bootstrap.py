@@ -33,6 +33,7 @@ if have_mpfr == False:
 # Importing them would not make sense because they refer back to things in this file
 exec(open("common.py").read())
 exec(open("compat_juliboots.py").read())
+exec(open("compat_scalar_blocks.py").read())
 exec(open("blocks1.py").read())
 exec(open("blocks2.py").read())
 
@@ -91,7 +92,10 @@ class ConformalBlockTable:
                produced by PyCFTBoot, all other parameters passed to the class are
                overwritten by the ones in the table. If it refers to one produced
                by JuliBoots, all parameters passed to the class except delta_12 and
-               delta_34 are overwritten.
+               delta_34 are overwritten. If it refers to a directory, the contents
+               will be treated as scalar_blocks output files. Parameters will be
+               only be overwritten in this case if they can easily be parsed from
+               the filenames.
 
     Attributes
     ----------
@@ -121,17 +125,20 @@ class ConformalBlockTable:
 
         if name != None:
             try:
-                dump_file = open(name, 'r')
-                token = next(dump_file)[:4]
-                dump_file.close()
-
-                if token == "self":
-                    dump_file = open(name, 'r')
-                    command = dump_file.read()
-                    exec(command)
-                    dump_file.close()
+                if os.path.isdir(name):
+                    scalar_blocks_read(self, name)
                 else:
-                    juliboots_read(self, name)
+                    dump_file = open(name, 'r')
+                    token = next(dump_file)[:4]
+                    dump_file.close()
+
+                    if token == "self":
+                        dump_file = open(name, 'r')
+                        command = dump_file.read()
+                        exec(command)
+                        dump_file.close()
+                    else:
+                        juliboots_read(self, name)
                 return
             except:
                 print("Table " + name + " not present, generating another")

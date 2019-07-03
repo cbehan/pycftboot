@@ -8,7 +8,7 @@ import shutil
 import sys
 
 i = 0
-files = ["common.py", "compat_juliboots.py", "blocks1.py", "blocks2.py"]
+files = ["common.py", "compat_juliboots.py", "compat_scalar_blocks.py", "blocks1.py", "blocks2.py"]
 main_file = open("bootstrap.py", 'r')
 
 for line in main_file:
