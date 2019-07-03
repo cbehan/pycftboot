@@ -135,12 +135,22 @@ def scalar_blocks_read(block_table, name):
             # All shifts, scalar or not, are undone here as we prefer to have this handle this step during XML writing
             derivatives.append(poly.subs(delta, delta - block_table.dim - l + 2).expand())
 
+        # The block for scalar exchange should not give zero for the identity
+        if l == 0:
+            for i in range(0, len(derivatives)):
+                poly = 0
+                coeffs = coefficients(derivatives[i])
+                for c in range(1, len(coeffs)):
+                    poly += coeffs[c] * (delta ** (c - 1))
+                derivatives[i] = poly
+
         poles = []
         nu = (block_table.dim - 2.0) / 2.0
         # Poles are not saved in the file so we have to reconstruct them
         for k in range(1, block_table.k_max + 1):
             # This program appears to use all the poles even when the scalars are identical
-            poles.append(delta_pole(nu, k, l, 1))
+            if k > 1 or l > 0:
+                poles.append(delta_pole(nu, k, l, 1))
             if k % 2 == 0:
                 poles.append(delta_pole(nu, k // 2, l, 2))
             if k <= l:
