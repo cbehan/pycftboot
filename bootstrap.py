@@ -602,7 +602,8 @@ class SDP:
                     for s in range(0, len(matrix[r])):
                         quad = matrix[r][s]
                         tab = conv_table_list[quad[1]]
-                        unit += quad[0] * tab.table[0].vector[i].subs(delta, 0).subs(delta_ext, (dim_list[quad[2]] + dim_list[quad[3]]) / 2.0)
+                        factor = self.shifted_prefactor(tab.table[0].poles, r_cross, 0, 0)
+                        unit += factor * quad[0] * tab.table[0].vector[i].subs(delta, 0).subs(delta_ext, (dim_list[quad[2]] + dim_list[quad[3]]) / 2.0)
 
                 self.m_order.append(chosen_tab.m_order[i])
                 self.n_order.append(chosen_tab.n_order[i])
