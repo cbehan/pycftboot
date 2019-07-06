@@ -1332,15 +1332,12 @@ class SDP:
                     any ".xml" at the end. Defaults to "mySDP".
         """
         l = self.get_table_index(spin_irrep)
-        prod1 = self.shifted_prefactor(self.table[0][0][0].poles, r_cross, 0, 0)
-        prod2 = self.shifted_prefactor(self.table[l][0][0].poles, r_cross, dimension, 0) * (-1)
+        prod = self.shifted_prefactor(self.table[l][0][0].poles, r_cross, dimension, 0) * (-1)
 
-        obj = []
         norm = []
         for i in range(0, len(self.unit)):
             norm.append(self.table[l][0][0].vector[i].subs(delta, dimension))
-            obj.append(self.unit[i] * prod1)
-        functional = self.solution_functional(self.get_bound(spin_irrep), spin_irrep, obj, norm, name)
+        functional = self.solution_functional(self.get_bound(spin_irrep), spin_irrep, self.unit, norm, name)
         output = self.read_output(name = name)
         primal_value = output["primalObjective"]
 
@@ -1362,7 +1359,7 @@ class SDP:
 
         eigenvalues = numpy.linalg.eigvalsh(outer_list)
         bound = float(primal_value) / min(eigenvalues)
-        return bound / prod2
+        return bound / prod
 
     def solution_functional(self, dimension, spin_irrep, obj = None, norm = None, name = "mySDP"):
         """
@@ -1622,10 +1619,7 @@ class SDP:
             identity = []
             extremal_blocks = []
             size = len(current_coeffs)
-            if current_target[0] == 0:
-                factor = self.shifted_prefactor(self.table[0][0][0].poles, r_cross, 0, 0) * (-1)
-            else:
-                factor = 1
+            if current_target[0] != 0:
                 j_id = current_target[1]
                 r_id = current_target[2]
             for i in current_rows:
@@ -1637,7 +1631,6 @@ class SDP:
                     (j, r) = pair
                     extremal_blocks.append(float(extremal_table[j][r][r][i]))
             identity = DenseMatrix(size + nullity, 1, identity)
-            identity = identity.mul_scalar(factor)
             extremal_matrix = DenseMatrix(size + nullity, size, extremal_blocks)
             if nullity == 0:
                 solution = extremal_matrix.solve(identity)
