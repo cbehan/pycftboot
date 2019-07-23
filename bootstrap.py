@@ -981,6 +981,8 @@ class SDP:
         single_poles = []
         double_poles = []
         ret = mpmath.mpf(0)
+        if len(poles) == 0:
+            return mpmath.factorial(pos) / ((-mpmath.log(rho_cross)) ** (pos + 1))
 
         for p in poles:
             p = mpmath.mpf(str(p))
