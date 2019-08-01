@@ -1029,6 +1029,8 @@ class SDP:
         """
         Outputs an XML file describing the `table`, `bounds`, `points` and `basis`
         for this `SDP` in a format that `SDPB` can use to check for solvability.
+        If the user has the Elemental version of `SDPB` then the `pvm2sdb` utility
+        (assumed to be in the same directory) is also run.
 
         Parameters
         ----------
@@ -1184,6 +1186,10 @@ class SDP:
         xml_file.close()
         doc.unlink()
 
+        if sdpb_vesion == 2:
+            pvm2sdp_path = sdpb_path[:-4] + "pvm2sdp"
+            os.spawnvp(os.P_WAIT, mpirun_path, ["mpirun", "-n", "1", pvm2sdp_path, str(prec), name + ".xml", name])
+
     def read_output(self, name = "mySDP"):
         """
         Reads an `SDPB` output file and returns a dictionary in which all entries
@@ -1195,7 +1201,10 @@ class SDP:
                     Defaults to "mySDP".
         """
         ret = {}
-        out_file = open(name + ".out", 'r')
+        if sdpb_version == 1:
+            out_file = open(name + ".out", 'r')
+        else:
+            out_file = open(name + "_out/out.txt", 'r')
         for line in out_file:
             (key, delimiter, value) = line.partition(" = ")
             value = value.replace('\n', '')
@@ -1206,6 +1215,17 @@ class SDP:
             command = "ret['" + key.strip() + "'] = " + value
             exec(command)
         out_file.close()
+
+        if sdpb_version == 2:
+            y = []
+            outfile = open(name + "_out/y.txt", 'r')
+            lines = outfile.readlines()
+            for i in range(1, len(lines)):
+                value = lines[i].replace('\n', '')
+                value = re.sub("([0-9]+\.[0-9]+e?-?[0-9]+)", r"RealMPFR('\1', prec)", value)
+                exec("y.append(" + value + ")")
+            outfile.close()
+            ret["y"] = y
         return ret
 
     def iterate(self, name = "mySDP"):
@@ -1221,7 +1241,11 @@ class SDP:
         obj = [0.0] * len(self.table[0][0][0].vector)
         self.write_xml(obj, self.unit, name)
 
-        os.spawnvp(os.P_WAIT, sdpb_path, ["sdpb", "-s", name + ".xml", "--precision=" + str(prec), "--findPrimalFeasible", "--findDualFeasible", "--noFinalCheckpoint"] + self.options)
+        if sdpb_version == 1:
+            os.spawnvp(os.P_WAIT, sdpb_path, ["sdpb", "-s", name + ".xml", "--precision=" + str(prec), "--findPrimalFeasible", "--findDualFeasible", "--noFinalCheckpoint"] + self.options)
+        else:
+            ppn = self.get_option("procsPerNode")
+            os.spawnvp(os.P_WAIT, mpirun_path, ["mpirun", "-n", ppn, sdpb_path, "-s", name, "--precision=" + str(prec), "--findPrimalFeasible", "--findDualFeasible", "--noFinalCheckpoint"] + self.options)
         output = self.read_output(name = name)
 
         terminate_reason = output["terminateReason"]
@@ -1397,7 +1421,11 @@ class SDP:
         self.write_xml(obj, norm, name)
         self.set_bound(spin_irrep, old)
 
-        os.spawnvp(os.P_WAIT, sdpb_path, ["sdpb", "-s", name + ".xml", "--precision=" + str(prec), "--noFinalCheckpoint"] + self.options)
+        if sdpb_version == 1:
+            os.spawnvp(os.P_WAIT, sdpb_path, ["sdpb", "-s", name + ".xml", "--precision=" + str(prec), "--noFinalCheckpoint"] + self.options)
+        else:
+            ppn = self.get_option("procsPerNode")
+            os.spawnvp(os.P_WAIT, mpirun_path, ["mpirun", "-n", ppn, sdpb_path, "-s", name, "--precision=" + str(prec), "--noFinalCheckpoint"] + self.options)
         output = self.read_output(name = name)
         return [eval_mpfr(1.0, prec)] + output["y"]
 
@@ -1715,7 +1743,10 @@ class SDP:
         aux_sdp.write_xml(obj, norm, name = "tmp")
 
         # SDPB should now run quickly with default options
-        os.spawnvp(os.P_WAIT, sdpb_path, ["sdpb", "-s", "tmp.xml", "--noFinalCheckpoint"])
+        if sdpb_version == 1:
+            os.spawnvp(os.P_WAIT, sdpb_path, ["sdpb", "-s", "tmp.xml", "--noFinalCheckpoint"])
+        else:
+            os.spawnvp(os.P_WAIT, mpirun_path, ["mpirun", "-n", "1", sdpb_path, "-s", "tmp.xml", "--noFinalCheckpoint"])
         output = self.read_output(name = "tmp")
         solution = output["y"]
         solution = solution[zeros + nullity:]
