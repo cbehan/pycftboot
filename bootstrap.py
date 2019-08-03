@@ -1187,7 +1187,7 @@ class SDP:
         doc.unlink()
 
         if sdpb_vesion == 2:
-            pvm2sdp_path = sdpb_path[:-4] + "pvm2sdp"
+            pvm2sdp_path = os.path.dirname(sdpb_path) + "/pvm2sdp"
             os.spawnvp(os.P_WAIT, mpirun_path, ["mpirun", "-n", "1", pvm2sdp_path, str(prec), name + ".xml", name])
 
     def read_output(self, name = "mySDP"):
