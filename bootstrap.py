@@ -1186,7 +1186,7 @@ class SDP:
         xml_file.close()
         doc.unlink()
 
-        if sdpb_vesion == 2:
+        if sdpb_version == 2:
             pvm2sdp_path = os.path.dirname(sdpb_path) + "/pvm2sdp"
             os.spawnvp(os.P_WAIT, mpirun_path, ["mpirun", "-n", "1", pvm2sdp_path, str(prec), name + ".xml", name])
 
