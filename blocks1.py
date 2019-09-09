@@ -47,22 +47,22 @@ def delta_residue(nu, k, l, delta_12, delta_34, series):
         return 0
 
     if series == 1:
-        ret = - ((k * (-4) ** k) / (factorial(k) ** 2)) * sympy.rf((1 - k + delta_12) / two, k) * sympy.rf((1 - k + delta_34) / two, k)
+        ret = - ((k * (-4) ** k) / (factorial(k) ** 2)) * rf((1 - k + delta_12) / two, k) * rf((1 - k + delta_34) / two, k)
         if l == 0 and nu == 0:
             # Take l to 0, then nu
             return ret * 2
         else:
-            return ret * (sympy.rf(l + 2 * nu, k) / sympy.rf(l + nu, k))
+            return ret * (rf(l + 2 * nu, k) / rf(l + nu, k))
     elif series == 2:
         factors = [l + nu + 1 - delta_12, l + nu + 1 + delta_12, l + nu + 1 - delta_34, l + nu + 1 + delta_34]
-        ret = ((k * sympy.rf(nu + 1, k - 1)) / (factorial(k) ** 2)) * ((l + nu - k) / (l + nu + k))
-        ret *= sympy.rf(-nu, k + 1) / ((sympy.rf((l + nu - k + 1) / 2, k) * sympy.rf((l + nu - k) / 2, k)) ** 2)
+        ret = ((k * rf(nu + 1, k - 1)) / (factorial(k) ** 2)) * ((l + nu - k) / (l + nu + k))
+        ret *= rf(-nu, k + 1) / ((rf((l + nu - k + 1) / 2, k) * rf((l + nu - k) / 2, k)) ** 2)
 
         for f in factors:
-            ret *= sympy.rf((f - k) / 2, k)
+            ret *= rf((f - k) / 2, k)
         return ret
     else:
-        return - ((k * (-4) ** k) / (factorial(k) ** 2)) * (sympy.rf(1 + l - k, k) * sympy.rf((1 - k + delta_12) / two, k) * sympy.rf((1 - k + delta_34) / two, k) / sympy.rf(1 + nu + l - k, k))
+        return - ((k * (-4) ** k) / (factorial(k) ** 2)) * (rf(1 + l - k, k) * rf((1 - k + delta_12) / two, k) * rf((1 - k + delta_34) / two, k) / rf(1 + nu + l - k, k))
 
 class LeadingBlockVector:
     def __init__(self, dim, l, m_max, n_max, delta_12, delta_34):
@@ -105,7 +105,7 @@ class LeadingBlockVector:
         elif nu == 0:
             ret = sympy.chebyshevt(l, eta)
         else:
-            ret = factorial(l) * sympy.gegenbauer(l, nu, eta) / sympy.rf(2 * nu, l)
+            ret = factorial(l) * sympy.gegenbauer(l, nu, eta) / rf(2 * nu, l)
 
         one = eval_mpfr(1, prec)
         two = eval_mpfr(2, prec)

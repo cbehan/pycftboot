@@ -23,6 +23,15 @@ else:
     sdpb_defaults = ["4", "1", "1"] + sdpb_defaults
     mpirun_path = "/usr/bin/mpirun"
 
+def rf(x, n):
+    """
+    Implements the rising factorial or Pochhammer symbol.
+    """
+    ret = 1
+    for k in range(0, n):
+        ret *= x + k
+    return ret
+
 def deepcopy(array):
     """
     Copies a list of a list so that entries can be changed non-destructively.
