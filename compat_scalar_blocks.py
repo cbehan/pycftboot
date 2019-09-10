@@ -45,7 +45,7 @@ class ConvolvedBlockTable2:
                 self.n_order.append(n)
 
                 expression = 0
-                old_coeff = eval_mpfr(Integer(1) / Integer(4), prec) ** delta_ext
+                old_coeff = RealMPFR("0.25", prec) ** delta_ext
                 for i in range(0, m + 1):
                     coeff = old_coeff
                     for j in range(0, n + 1):

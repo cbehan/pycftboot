@@ -5,7 +5,7 @@ mpmath.mp.dps = dec_prec
 tiny = RealMPFR("1e-" + str(dec_prec // 2), prec)
 
 rho_cross = 3 - 2 * mpmath.sqrt(2)
-r_cross = eval_mpfr(3 - 2 * sqrt(2), prec)
+r_cross = 3 - 2 * sqrt(2).n(prec)
 
 ell = Symbol('ell')
 delta  = Symbol('delta')
@@ -95,9 +95,9 @@ def coefficients(polynomial):
     for d in range(0, degree + 1):
         if extract_power(coeff_list[pos]) == d:
             if d == 0:
-                ret.append(eval_mpfr(coeff_list[0], prec))
+                ret.append(RealMPFR(str(coeff_list[0]), prec))
             else:
-                ret.append(eval_mpfr(coeff_list[pos].args[0], prec))
+                ret.append(RealMPFR(str(coeff_list[pos].args[0]), prec))
             pos += 1
         else:
             ret.append(0)
@@ -205,8 +205,8 @@ def rules(m_max, n_max):
                 expression1 = expression1.diff(a)
                 expression2 = expression2.diff(a)
 
-            rules1.append(expression1.subs({hack : eval_mpfr(2, prec), a : 1, b : 0}))
-            rules2.append(expression2.subs({hack : eval_mpfr(2, prec), a : 1, b : 0}))
+            rules1.append(expression1.subs({hack : RealMPFR("2", prec), a : 1, b : 0}))
+            rules2.append(expression2.subs({hack : RealMPFR("2", prec), a : 1, b : 0}))
             m_order.append(m)
             n_order.append(n)
 

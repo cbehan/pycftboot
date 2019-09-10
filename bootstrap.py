@@ -152,13 +152,13 @@ class ConformalBlockTable:
         self.table = small_table.table
 
         a = Symbol('a')
-        nu = eval_mpfr((dim / Integer(2)) - 1, prec)
+        nu = RealMPFR(str(dim - 2), prec) / 2
         c_2 = (ell * (ell + 2 * nu) + delta * (delta - 2 * nu - 2)) / 2
         c_4 = ell * (ell + 2 * nu) * (delta - 1) * (delta - 2 * nu - 1)
         polys = [0, 0, 0, 0, 0]
         poly_derivs = [[], [], [], [], []]
-        delta_prod = delta_12 * delta_34 / (eval_mpfr(-2, prec))
-        delta_sum = (delta_12 - delta_34) / (eval_mpfr(-2, prec))
+        delta_prod = delta_12 * delta_34 / RealMPFR("-2", prec)
+        delta_sum = (delta_12 - delta_34) / RealMPFR("-2", prec)
 
         # Polynomial 0 goes with the lowest order derivative on the right hand side
         # Polynomial 3 goes with the highest order derivative on the right hand side
@@ -194,7 +194,7 @@ class ConformalBlockTable:
                     coeff = 0
                     index = max(m - i - 4, 0)
 
-                    prefactor = eval_mpfr(1, prec)
+                    prefactor = RealMPFR("1", prec)
                     for k in range(0, index):
                         prefactor *= (m - 4 - k)
                         prefactor /= k + 1
@@ -390,7 +390,7 @@ class ConvolvedBlockTable:
                 self.n_order.append(n)
 
                 expression = 0
-                old_coeff = eval_mpfr(Integer(1) / Integer(4), prec) ** delta_ext
+                old_coeff = RealMPFR("0.25", prec) ** delta_ext
                 for j in range(0, n + 1):
                     coeff = old_coeff
                     for i in range(0, m + 1):
@@ -938,8 +938,8 @@ class SDP:
         """
         ret = []
         for d in range(0, degree + 1):
-            point = -(pi ** 2) * ((4 * d - 1) ** 2) / (64 * (degree + 1) * log(r_cross))
-            ret.append(eval_mpfr(point, prec))
+            point = -(pi.n(prec) ** 2) * ((4 * d - 1) ** 2) / (64 * (degree + 1) * log(r_cross))
+            ret.append(point)
         return ret
 
     def shifted_prefactor(self, poles, base, x, shift):
@@ -1145,7 +1145,7 @@ class SDP:
                 elt_node = doc.createElement("elt")
                 elt_node.appendChild(doc.createTextNode(points[d].__str__()))
                 sample_point_node.appendChild(elt_node)
-                damped_rational = self.shifted_prefactor(poles, r_cross, points[d], eval_mpfr(delta_min, prec))
+                damped_rational = self.shifted_prefactor(poles, r_cross, points[d], RealMPFR(str(delta_min), prec))
                 elt_node = doc.createElement("elt")
                 elt_node.appendChild(doc.createTextNode(damped_rational.__str__()))
                 sample_scaling_node.appendChild(elt_node)
@@ -1427,7 +1427,7 @@ class SDP:
             ppn = self.get_option("procsPerNode")
             os.spawnvp(os.P_WAIT, mpirun_path, ["mpirun", "-n", ppn, sdpb_path, "-s", name, "--precision=" + str(prec), "--noFinalCheckpoint"] + self.options)
         output = self.read_output(name = name)
-        return [eval_mpfr(1.0, prec)] + output["y"]
+        return [RealMPFR("1", prec)] + output["y"]
 
     def extremal_dimensions(self, functional, spin_irrep):
         """
@@ -1708,10 +1708,10 @@ class SDP:
 
         constraint_matrix = []
         for i in range(0, 2 * (zeros + nullity)):
-            constraint_matrix.append([eval_mpfr(0, prec)] * (2 * zeros + nullity))
+            constraint_matrix.append([RealMPFR("0", prec)] * (2 * zeros + nullity))
         for i in range(0, zeros + nullity):
-            constraint_matrix[i][i] = eval_mpfr(1, prec)
-            constraint_matrix[zeros + nullity + i][i] = eval_mpfr(1, prec)
+            constraint_matrix[i][i] = RealMPFR("1", prec)
+            constraint_matrix[zeros + nullity + i][i] = RealMPFR("1", prec)
         for i in range(0, zeros + nullity):
             for j in range(0, zeros):
                 constraint_matrix[i][zeros + nullity + j] = matrix.get(i, j) * (-1)
@@ -1722,11 +1722,11 @@ class SDP:
 
         extra = []
         for i in range(0, 2 * zeros + nullity):
-            extra.append([eval_mpfr(0, prec)] * (2 * zeros + nullity))
+            extra.append([RealMPFR("0", prec)] * (2 * zeros + nullity))
         for i in range(0, 2 * zeros + nullity):
-            extra[i][i] = eval_mpfr(1, prec)
+            extra[i][i] = RealMPFR("1", prec)
         constraint_matrix = extra + constraint_matrix
-        constraint_vector = [eval_mpfr(0, prec)] * (2 * zeros + nullity) + constraint_vector
+        constraint_vector = [RealMPFR("0", prec)] * (2 * zeros + nullity) + constraint_vector
 
         # Now that the functional components are positive, make a toy SDP for this
         aux_table1 = ConformalBlockTable(1, 0, 0, 0, 0)
