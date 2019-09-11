@@ -157,8 +157,8 @@ class ConformalBlockTable:
         c_4 = ell * (ell + 2 * nu) * (delta - 1) * (delta - 2 * nu - 1)
         polys = [0, 0, 0, 0, 0]
         poly_derivs = [[], [], [], [], []]
-        delta_prod = delta_12 * delta_34 / RealMPFR("-2", prec)
-        delta_sum = (delta_12 - delta_34) / RealMPFR("-2", prec)
+        delta_prod = -delta_12 * delta_34 / two
+        delta_sum = -(delta_12 - delta_34) / two
 
         # Polynomial 0 goes with the lowest order derivative on the right hand side
         # Polynomial 3 goes with the highest order derivative on the right hand side
@@ -194,7 +194,7 @@ class ConformalBlockTable:
                     coeff = 0
                     index = max(m - i - 4, 0)
 
-                    prefactor = RealMPFR("1", prec)
+                    prefactor = one
                     for k in range(0, index):
                         prefactor *= (m - 4 - k)
                         prefactor /= k + 1
@@ -980,7 +980,7 @@ class SDP:
         """
         single_poles = []
         double_poles = []
-        ret = RealMPFR("0", prec)
+        ret = zero
         if len(poles) == 0:
             return factorial(pos) / ((-log(r_cross)) ** (pos + 1))
 
@@ -994,17 +994,17 @@ class SDP:
                 single_poles.append(p - shift)
 
         for i in range(0, len(single_poles)):
-            denom = RealMPFR("1", prec)
+            denom = one
             pole = single_poles[i]
             other_single_poles = single_poles[:i] + single_poles[i + 1:]
             for p in other_single_poles:
                 denom *= pole - p
             for p in double_poles:
                 denom *= (pole - p) ** 2
-            ret += (RealMPFR("1", prec) / denom) * (r_cross ** pole) * ((-pole) ** pos) * factorial(pos) * uppergamma(RealMPFR(str(-pos), prec), pole * log(r_cross))
+            ret += (one / denom) * (r_cross ** pole) * ((-pole) ** pos) * factorial(pos) * uppergamma(RealMPFR(str(-pos), prec), pole * log(r_cross))
 
         for i in range(0, len(double_poles)):
-            denom = RealMPFR("1", prec)
+            denom = one
             pole = double_poles[i]
             other_double_poles = double_poles[:i] + double_poles[i + 1:]
             for p in other_double_poles:
@@ -1012,14 +1012,14 @@ class SDP:
             for p in single_poles:
                 denom *= pole - p
             # Contribution of the most divergent part
-            ret += (RealMPFR("1", prec) / (pole * denom)) * ((-1) ** (pos + 1)) * factorial(pos) * (log(r_cross) ** (-pos))
-            ret -= (RealMPFR("1", prec) / denom) * (r_cross ** pole) * ((-pole) ** (pos - 1)) * factorial(pos) * uppergamma(RealMPFR(str(-pos), prec), pole * log(r_cross)) * (pos + pole * log(r_cross))
+            ret += (one / (pole * denom)) * ((-1) ** (pos + 1)) * factorial(pos) * (log(r_cross) ** (-pos))
+            ret -= (one / denom) * (r_cross ** pole) * ((-pole) ** (pos - 1)) * factorial(pos) * uppergamma(RealMPFR(str(-pos), prec), pole * log(r_cross)) * (pos + pole * log(r_cross))
 
             factor = 0
             for p in other_double_poles:
-                factor -= RealMPFR("2", prec) / (pole - p)
+                factor -= two / (pole - p)
             for p in single_poles:
-                factor -= RealMPFR("1", prec) / (pole - p)
+                factor -= one / (pole - p)
             # Contribution of the least divergent part
             ret += (factor / denom) * (r_cross ** pole) * ((-pole) ** pos) * factorial(pos) * uppergamma(RealMPFR(str(-pos), prec), pole * log(r_cross))
 
@@ -1427,7 +1427,7 @@ class SDP:
             ppn = self.get_option("procsPerNode")
             os.spawnvp(os.P_WAIT, mpirun_path, ["mpirun", "-n", ppn, sdpb_path, "-s", name, "--precision=" + str(prec), "--noFinalCheckpoint"] + self.options)
         output = self.read_output(name = name)
-        return [RealMPFR("1", prec)] + output["y"]
+        return [one] + output["y"]
 
     def extremal_dimensions(self, functional, spin_irrep):
         """
@@ -1708,10 +1708,10 @@ class SDP:
 
         constraint_matrix = []
         for i in range(0, 2 * (zeros + nullity)):
-            constraint_matrix.append([RealMPFR("0", prec)] * (2 * zeros + nullity))
+            constraint_matrix.append([zero] * (2 * zeros + nullity))
         for i in range(0, zeros + nullity):
-            constraint_matrix[i][i] = RealMPFR("1", prec)
-            constraint_matrix[zeros + nullity + i][i] = RealMPFR("1", prec)
+            constraint_matrix[i][i] = one
+            constraint_matrix[zeros + nullity + i][i] = one
         for i in range(0, zeros + nullity):
             for j in range(0, zeros):
                 constraint_matrix[i][zeros + nullity + j] = matrix.get(i, j) * (-1)
@@ -1722,11 +1722,11 @@ class SDP:
 
         extra = []
         for i in range(0, 2 * zeros + nullity):
-            extra.append([RealMPFR("0", prec)] * (2 * zeros + nullity))
+            extra.append([zero] * (2 * zeros + nullity))
         for i in range(0, 2 * zeros + nullity):
-            extra[i][i] = RealMPFR("1", prec)
+            extra[i][i] = one
         constraint_matrix = extra + constraint_matrix
-        constraint_vector = [RealMPFR("0", prec)] * (2 * zeros + nullity) + constraint_vector
+        constraint_vector = [zero] * (2 * zeros + nullity) + constraint_vector
 
         # Now that the functional components are positive, make a toy SDP for this
         aux_table1 = ConformalBlockTable(1, 0, 0, 0, 0)

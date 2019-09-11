@@ -4,7 +4,9 @@ dec_prec = int((3.0 / 10.0) * prec)
 mpmath.mp.dps = dec_prec
 tiny = RealMPFR("1e-" + str(dec_prec // 2), prec)
 
-rho_cross = 3 - 2 * mpmath.sqrt(2)
+zero = zero.n(prec)
+one = one.n(prec)
+two = 2 * one
 r_cross = 3 - 2 * sqrt(2).n(prec)
 
 ell = Symbol('ell')

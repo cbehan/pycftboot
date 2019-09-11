@@ -41,7 +41,6 @@ def delta_residue(nu, k, l, delta_12, delta_34, series):
     series:   The parameter i desribing the three types of poles in
               arXiv:1406.4858.
     """
-    two = eval_mpfr(2, prec)
     # Time saving special case
     if series != 2 and k % 2 != 0 and delta_12 == 0 and delta_34 == 0:
         return 0
@@ -106,9 +105,6 @@ class LeadingBlockVector:
             ret = sympy.chebyshevt(l, eta)
         else:
             ret = factorial(l) * sympy.gegenbauer(l, nu, eta) / rf(2 * nu, l)
-
-        one = eval_mpfr(1, prec)
-        two = eval_mpfr(2, prec)
 
         # Time saving special case
         if delta_12 == delta_34:

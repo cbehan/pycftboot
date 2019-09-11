@@ -78,7 +78,7 @@ def juliboots_read(block_table, name):
                 prod2 *= (delta - p) ** 2
                 prod2 = prod2.expand()
             derivatives[i] = derivatives[i] * prod2 + double_pole_term * prod1
-            derivatives[i] = derivatives[i] / (RealMPFR("2", prec) ** (block_table.m_order[i] + 2 * block_table.n_order[i]))
+            derivatives[i] = derivatives[i] / (two ** (block_table.m_order[i] + 2 * block_table.n_order[i]))
             derivatives[i] = derivatives[i].expand()
 
         poles = single_poles + (double_poles * 2)
@@ -141,7 +141,7 @@ def juliboots_write(block_table, name):
             # We get the numerator degree by subtracting the degree of series
             # The difference between this and the number of poles is the degree of the polynomial we write
             degree = len(coeff_list) - max_degree - len(block_table.table[l].poles) - 1
-            factor = RealMPFR("2", prec) ** (block_table.m_order[i] + 2 * block_table.n_order[i])
+            factor = two ** (block_table.m_order[i] + 2 * block_table.n_order[i])
             for k in range(0, max_degree + 1):
                 index = degree - k
                 if index >= 0:
@@ -165,7 +165,7 @@ def juliboots_write(block_table, name):
 
         for i in range(0, len(block_table.table[l].vector)):
             poly = block_table.table[l].vector[i]
-            factor = RealMPFR("2", prec) ** (block_table.m_order[i] + 2 * block_table.n_order[i])
+            factor = two ** (block_table.m_order[i] + 2 * block_table.n_order[i])
             for p in single_poles:
                 num = poly.subs(delta, p)
                 denom = omit_all(block_table.table[l].poles, [p], p)
@@ -178,7 +178,7 @@ def juliboots_write(block_table, name):
 
         for i in range(0, len(block_table.table[l].vector)):
             poly = block_table.table[l].vector[i]
-            factor = RealMPFR("2", prec) ** (block_table.m_order[i] + 2 * block_table.n_order[i])
+            factor = two ** (block_table.m_order[i] + 2 * block_table.n_order[i])
             for p in double_poles:
                 num = poly.subs(delta, p)
                 denom = omit_all(block_table.table[l].poles, [p], p)
