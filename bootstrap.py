@@ -857,7 +857,7 @@ class SDP:
         index: The position of the matrix in `table` whose basis needs updating.
         """
         poles = self.table[index][0][0].poles
-        delta_min = mpmath.mpf(self.bounds[index].__str__())
+        delta_min = self.bounds[index]
         bands = []
         matrix = []
 
@@ -873,7 +873,7 @@ class SDP:
 
         for d in range(0, 2 * (degree // 2) + 1):
             result = self.integral(d, delta_min, poles)
-            bands.append(result)
+            bands.append(mpmath.mpf(str(result)))
         for r in range(0, (degree // 2) + 1):
             new_entries = []
             for s in range(0, (degree // 2) + 1):
@@ -980,12 +980,12 @@ class SDP:
         """
         single_poles = []
         double_poles = []
-        ret = mpmath.mpf(0)
+        ret = RealMPFR("0", prec)
         if len(poles) == 0:
-            return mpmath.factorial(pos) / ((-mpmath.log(rho_cross)) ** (pos + 1))
+            return factorial(pos) / ((-log(r_cross)) ** (pos + 1))
 
         for p in poles:
-            p = mpmath.mpf(str(p))
+            p = RealMPFR(str(p), prec)
 
             if (p - shift) in single_poles:
                 single_poles.remove(p - shift)
@@ -994,17 +994,17 @@ class SDP:
                 single_poles.append(p - shift)
 
         for i in range(0, len(single_poles)):
-            denom = mpmath.mpf(1)
+            denom = RealMPFR("1", prec)
             pole = single_poles[i]
             other_single_poles = single_poles[:i] + single_poles[i + 1:]
             for p in other_single_poles:
                 denom *= pole - p
             for p in double_poles:
                 denom *= (pole - p) ** 2
-            ret += (mpmath.mpf(1) / denom) * (rho_cross ** pole) * ((-pole) ** pos) * mpmath.factorial(pos) * mpmath.gammainc(-pos, a = pole * mpmath.log(rho_cross))
+            ret += (RealMPFR("1", prec) / denom) * (r_cross ** pole) * ((-pole) ** pos) * factorial(pos) * uppergamma(RealMPFR(str(-pos), prec), pole * log(r_cross))
 
         for i in range(0, len(double_poles)):
-            denom = mpmath.mpf(1)
+            denom = RealMPFR("1", prec)
             pole = double_poles[i]
             other_double_poles = double_poles[:i] + double_poles[i + 1:]
             for p in other_double_poles:
@@ -1012,18 +1012,18 @@ class SDP:
             for p in single_poles:
                 denom *= pole - p
             # Contribution of the most divergent part
-            ret += (mpmath.mpf(1) / (pole * denom)) * ((-1) ** (pos + 1)) * mpmath.factorial(pos) * ((mpmath.log(rho_cross)) ** (-pos))
-            ret -= (mpmath.mpf(1) / denom) * (rho_cross ** pole) * ((-pole) ** (pos - 1)) * mpmath.factorial(pos) * mpmath.gammainc(-pos, a = pole * mpmath.log(rho_cross)) * (pos + pole * mpmath.log(rho_cross))
+            ret += (RealMPFR("1", prec) / (pole * denom)) * ((-1) ** (pos + 1)) * factorial(pos) * (log(r_cross) ** (-pos))
+            ret -= (RealMPFR("1", prec) / denom) * (r_cross ** pole) * ((-pole) ** (pos - 1)) * factorial(pos) * uppergamma(RealMPFR(str(-pos), prec), pole * log(r_cross)) * (pos + pole * log(r_cross))
 
             factor = 0
             for p in other_double_poles:
-                factor -= mpmath.mpf(2) / (pole - p)
+                factor -= RealMPFR("2", prec) / (pole - p)
             for p in single_poles:
-                factor -= mpmath.mpf(1) / (pole - p)
+                factor -= RealMPFR("1", prec) / (pole - p)
             # Contribution of the least divergent part
-            ret += (factor / denom) * (rho_cross ** pole) * ((-pole) ** pos) * mpmath.factorial(pos) * mpmath.gammainc(-pos, a = pole * mpmath.log(rho_cross))
+            ret += (factor / denom) * (r_cross ** pole) * ((-pole) ** pos) * factorial(pos) * uppergamma(RealMPFR(str(-pos), prec), pole * log(r_cross))
 
-        return (rho_cross ** shift) * ret
+        return (r_cross ** shift) * ret
 
     def write_xml(self, obj, norm, name = "mySDP"):
         """
@@ -1152,8 +1152,8 @@ class SDP:
 
             matrix = []
             if j >= len(self.bounds):
-                delta_min = mpmath.mpf(delta_min.__str__())
                 result = self.integral(0, delta_min, poles)
+                result = mpmath.mpf(str(result))
                 result = 1.0 / mpmath.sqrt(result)
                 matrix = mpmath.matrix([result])
             else:
