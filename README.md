@@ -74,7 +74,7 @@ If that doesn't work, you should check if the dependencies import correctly.
         python
         import symengine
 
-Assuming that all of this works, `python tutorial.py` will enter a tutorial with four examples. There are three changes that you might want to make to `bootstrap.py`. One is changing `python2` to `python` in the first line, for systems that don't append a specific number. Another is setting the path of SDPB by searching for `/usr/bin/sdpb` and updating this. Finally, if the sympy package you installed does not have mpmath as a separate module, change `import mpmath` to `import sympy.mpmath as mpmath`. Have fun constraining CFTs and convincing cluster maintainers to install fairly new software!
+Assuming that all of this works, `python tutorial.py` will enter a tutorial with four examples. There are two changes that you might want to make to `bootstrap.py`. One is changing `python2` to `python` in the first line, for systems that don't append a specific number. The other is setting the path of SDPB and related executables by searching for `/usr/bin/sdpb` and updating this. Have fun constraining CFTs and convincing cluster maintainers to install fairly new software!
 
 ## Attribution
 If PyCFTBoot is helpful in one of your publications, please cite:

@@ -15,7 +15,6 @@ dimensions and transform in arbitrary representations of a global symmetry.
 from __future__ import print_function
 import xml.dom.minidom
 import numpy.polynomial
-import mpmath
 import time
 import re
 import os
@@ -873,16 +872,16 @@ class SDP:
 
         for d in range(0, 2 * (degree // 2) + 1):
             result = self.integral(d, delta_min, poles)
-            bands.append(mpmath.mpf(str(result)))
+            bands.append(result)
         for r in range(0, (degree // 2) + 1):
             new_entries = []
             for s in range(0, (degree // 2) + 1):
                 new_entries.append(bands[r + s])
             matrix.append(new_entries)
 
-        matrix = mpmath.matrix(matrix)
-        matrix = mpmath.cholesky(matrix, tol = mpmath.mpf(1e-200))
-        matrix = mpmath.inverse(matrix)
+        matrix = DenseMatrix(matrix)
+        matrix = matrix.cholesky()
+        matrix = matrix.inv()
         self.basis[index] = matrix
 
     def reshuffle_with_normalization(self, vector, norm):
@@ -1153,9 +1152,8 @@ class SDP:
             matrix = []
             if j >= len(self.bounds):
                 result = self.integral(0, delta_min, poles)
-                result = mpmath.mpf(str(result))
-                result = 1.0 / mpmath.sqrt(result)
-                matrix = mpmath.matrix([result])
+                result = one / sqrt(result)
+                matrix = DenseMatrix([[result]])
             else:
                 matrix = self.basis[j]
 
@@ -1733,7 +1731,7 @@ class SDP:
         aux_table2 = ConvolvedBlockTable(aux_table1)
         aux_sdp = SDP(0, aux_table2)
         aux_sdp.bounds = [0] * len(constraint_vector)
-        aux_sdp.basis = [mpmath.matrix([[1]])] * len(constraint_vector)
+        aux_sdp.basis = [DenseMatrix([[1]])] * len(constraint_vector)
         for i in range(0, len(constraint_vector)):
             block = [constraint_vector[i]] + constraint_matrix[i]
             aux_sdp.table.append([[PolynomialVector(block, [0, 0], [])]])

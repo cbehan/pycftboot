@@ -1,7 +1,6 @@
 cutoff = 0
 prec = 660
 dec_prec = int((3.0 / 10.0) * prec)
-mpmath.mp.dps = dec_prec
 tiny = RealMPFR("1e-" + str(dec_prec // 2), prec)
 
 zero = zero.n(prec)
