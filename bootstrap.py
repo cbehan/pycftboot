@@ -36,6 +36,15 @@ exec(open("compat_scalar_blocks.py").read())
 exec(open("blocks1.py").read())
 exec(open("blocks2.py").read())
 
+# MPFR's implementation of the incomplete gamma function is still not optimal
+# It is therefore worthwhile to test whether the following block improves performance
+"""
+import mpmath
+mpmath.mp.dps = dec_prec
+def uppergamma(x, a):
+    return RealMPFR(str(mpmath.gammainc(mpmath.mpf(str(x)), a = mpmath.mpf(str(a)))), prec)
+"""
+
 class PolynomialVector:
     """
     The main class for vectors on which the functionals being found by SDPB may act.
