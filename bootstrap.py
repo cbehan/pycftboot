@@ -1318,7 +1318,7 @@ class SDP:
 
             # Using the same name twice in a row is only dangerous if the runs are really long
             start = time.time()
-            if checkpoints:
+            if checkpoints and sdpb_version == 1:
                 result = self.iterate(name = str(start))
             else:
                 result = self.iterate()
