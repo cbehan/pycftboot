@@ -1252,7 +1252,7 @@ class SDP:
             os.spawnvp(os.P_WAIT, sdpb_path, ["sdpb", "-s", name + ".xml", "--precision=" + str(prec), "--findPrimalFeasible", "--findDualFeasible", "--noFinalCheckpoint"] + self.options)
         else:
             ppn = self.get_option("procsPerNode")
-            os.spawnvp(os.P_WAIT, mpirun_path, ["mpirun", "-n", ppn, sdpb_path, "-s", name, "--precision=" + str(prec), "--findPrimalFeasible", "--findDualFeasible", "--noFinalCheckpoint"] + self.options)
+            os.spawnvp(os.P_WAIT, mpirun_path, ["mpirun", "-n", ppn, sdpb_path, "-s", name, "--precision=" + str(prec), "--findPrimalFeasible", "--findDualFeasible"] + self.options)
         output = self.read_output(name = name)
 
         terminate_reason = output["terminateReason"]
