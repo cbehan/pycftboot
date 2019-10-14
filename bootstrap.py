@@ -406,7 +406,7 @@ class ConvolvedBlockTable:
                         coeff *= (i + 2 * j - 2 * delta_ext) * (m - i) / (i + 1)
                     old_coeff *= (j - delta_ext) * (n - j) / (j + 1)
 
-                deriv = expression / (factorial(m) * factorial(n))
+                deriv = expression / RealMPFR(str(factorial(m) * factorial(n)), prec)
                 derivatives.append(deriv)
 
         combined_block_table = []
