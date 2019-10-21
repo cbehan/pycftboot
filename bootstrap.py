@@ -866,6 +866,8 @@ class SDP:
         """
         poles = self.table[index][0][0].poles
         delta_min = self.bounds[index]
+        delta_min = float(delta_min)
+        delta_min = RealMPFR(str(delta_min), prec)
         bands = []
         matrix = []
 
