@@ -755,8 +755,9 @@ class SDP:
                            entry is the spin and the second is the label found in
                            `vector_types` or 0 if not present. Defaults to -1 which
                            means all operators.
-        delta_min:         [Optional] The minimum scaling dimension to set. Defaults
-                           to -1 which means unitarity.
+        delta_min:         [Optional] The minimum scaling dimension to set. Also
+                           accepts oo to indicate that a continuum should not be
+                           included. Defaults to -1 which means unitarity.
         reset_basis:       [Optional] An internal parameter which may be used to
                            prevent the orthogonal polynomials which improve the
                            numerical stability of `SDPB` from being recalculated.
@@ -781,7 +782,7 @@ class SDP:
             else:
                 self.bounds[l] = delta_min
 
-            if reset_basis:
+            if reset_basis and delta_min != oo:
                 self.set_basis(l)
 
     def get_option(self, key):
@@ -1101,7 +1102,14 @@ class SDP:
             objective_node.appendChild(elt_node)
 
         for j in range(0, len(self.table)):
+            if j >= len(self.bounds):
+                delta_min = 0
+            else:
+                delta_min = self.bounds[j]
+            if delta_min == oo:
+                continue
             size = len(self.table[j])
+            degree = 0
 
             matrix_node = doc.createElement("polynomialVectorMatrix")
             rows_node = doc.createElement("rows")
@@ -1112,12 +1120,6 @@ class SDP:
             bilinear_basis_node = doc.createElement("bilinearBasis")
             rows_node.appendChild(doc.createTextNode(size.__str__()))
             cols_node.appendChild(doc.createTextNode(size.__str__()))
-
-            degree = 0
-            if j >= len(self.bounds):
-                delta_min = 0
-            else:
-                delta_min = self.bounds[j]
 
             for r in range(0, size):
                 for s in range(0, size):
