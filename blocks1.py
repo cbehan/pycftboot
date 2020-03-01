@@ -344,5 +344,7 @@ class ConformalBlockTableSeed:
     def dump(self, name, form = None):
         if form == "juliboots":
             juliboots_write(self, name)
+        elif form == "scalar_blocks":
+            scalar_blocks_write(self, name)
         else:
             dump_table_contents(self, name)
