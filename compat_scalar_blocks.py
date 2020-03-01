@@ -115,3 +115,48 @@ def scalar_blocks_read(block_table, name):
                     poly += coeffs[c] * (delta ** (c - remove_zero))
                 derivatives[i] = poly
         block_table.table.append(PolynomialVector(derivatives, [l, 0], poles))
+
+def scalar_blocks_write(block_table, name):
+    """
+    This writes out a block table in the format that scalar_blocks uses. It is
+    triggered when a `ConformalBlockTable` is dumped with the right format string.
+    """
+    os.makedirs(name)
+    name_prefix = "abDerivTable-d" + str(block_table.dim) + "-delta12-" + str(block_table.delta_12) + "-delta34-" + str(block_table.delta_34) + "-L"
+    name_suffix = "-nmax" + str(block_table.n_max + 1) + "-keptPoleOrder" + str(block_table.k_max) + "-order" + str(block_table.k_max) + ".m"
+    for l in range(0, len(block_table.table)):
+        full = name + "/" + name_prefix + str(block_table.table[l].label[0]) + name_suffix
+        block_file = open(full, 'w')
+        block_file.write('{')
+        for i in range(0, len(block_table.table[l].vector)):
+            poly = block_table.table[l].vector[i].subs(delta, delta + block_table.dim + l - 2).expand()
+            coeffs = coefficients(poly)
+            block_file.write("abDeriv[" + str(block_table.m_order[i]) + "," + str(block_table.n_order[i]) + "] -> " + str(coeffs[0]) + "\n  ")
+            for c in range(1, len(coeffs)):
+                block_file.write(" + " + str(coeffs[c]) + "*x^" + str(c))
+                if c == len(coeffs) - 1:
+                    block_file.write(",\n ")
+                else:
+                    block_file.write("\n  ")
+
+        single_poles = []
+        double_poles = []
+        for p in block_table.table[l].poles:
+            if p in single_poles:
+                single_poles.remove(p)
+                double_poles.append(p)
+            else:
+                single_poles.append(p)
+
+        block_file.write("singlePoles -> {")
+        for p in range(0, len(single_poles)):
+            block_file.write(str(single_poles[p]))
+            if p < len(single_poles) - 1:
+                block_file.write(",\n                 ")
+        block_file.write("},\n doublePoles -> {")
+        for p in range(0, len(double_poles)):
+            block_file.write(str(double_poles[p]))
+            if p < len(double_poles) - 1:
+                block_file.write(",\n                 ")
+        block_file.write('}}')
+        block_file.close()

@@ -280,11 +280,13 @@ class ConformalBlockTable:
         ----------
         name: The path to use for output.
         form: [Optional] A string indicating that the file should be saved in
-              another program's format if it is equal to "juliboots". Any other
-              value will be ignored. Defaults to `None`.
+              another program's format if it is equal to "scalar_blocks" or
+              "juliboots". Any other value will be ignored. Defaults to `None`.
         """
         if form == "juliboots":
             juliboots_write(self, name)
+        elif form == "scalar_blocks":
+            scalar_blocks_write(self, name)
         else:
             dump_table_contents(self, name)
 
