@@ -50,6 +50,7 @@ def scalar_blocks_read(block_table, name):
 
     block_table.table = []
     for f in files:
+        remove_zero = 0
         info = f.replace('--', '-')
         full = name + "/" + f
         l = int(info.split('-')[6][1:])
@@ -57,16 +58,20 @@ def scalar_blocks_read(block_table, name):
             block_table.odd_spins = True
         if l > block_table.l_max:
             block_table.l_max = l
+
         derivatives = []
-        vector = open(full, 'r').read().replace('{', '').replace('}', '')
-        vector = re.sub("abDeriv\[[0-9]+,[0-9]+\]", "", vector).split(',\n')
+        vector_with_poles = open(full, 'r').read().replace('{', '').replace('}', '').split("Poles -> ")
+        if len(vector_with_poles) < 3:
+            print("Please rerun scalar_blocks with --output-poles")
+            return
+        vector = vector_with_poles[0]
+        single_poles = vector_with_poles[1].split(',\n')
+        double_poles = vector_with_poles[2].split(',\n')
+        vector = re.sub("abDeriv\[[0-9]+,[0-9]+\]", "", vector).split(',\n')[:-1]
         for el in vector:
             poly = 0
             poly_lines = el.split('\n')
-            # Watch out for the blank line at the end
             for k in range(0, len(poly_lines)):
-                if len(poly_lines[k]) == 0:
-                    continue
                 if k == 0:
                     coeff = poly_lines[k].split('->')[1]
                 else:
@@ -76,24 +81,37 @@ def scalar_blocks_read(block_table, name):
             # All shifts, scalar or not, are undone here as we prefer to handle this step during XML writing
             derivatives.append(poly.subs(delta, delta - block_table.dim - l + 2).expand())
 
+        poles = []
+        for p in range(0, len(single_poles)):
+            pole = single_poles[p]
+            if p != 0:
+                pole = pole[17:]
+            if pole == '' or pole == '\n':
+                continue
+            pole = RealMPFR(pole, prec)
+            if l == 0 and abs(pole) < tiny:
+                remove_zero = 1
+                continue
+            poles.append(pole)
+        for p in range(0, len(double_poles)):
+            pole = double_poles[p]
+            if p != 0:
+                pole = pole[17:]
+            if pole == '' or pole == '\n':
+                continue
+            pole = RealMPFR(pole, prec)
+            if l == 0 and abs(pole) < tiny:
+                remove_zero = 2
+                continue
+            poles.append(pole)
+            poles.append(pole)
+
         # The block for scalar exchange should not give zero for the identity
-        if l == 0:
+        if remove_zero > 0:
             for i in range(0, len(derivatives)):
                 poly = 0
                 coeffs = coefficients(derivatives[i])
-                for c in range(1, len(coeffs)):
-                    poly += coeffs[c] * (delta ** (c - 1))
+                for c in range(remove_zero, len(coeffs)):
+                    poly += coeffs[c] * (delta ** (c - remove_zero))
                 derivatives[i] = poly
-
-        poles = []
-        nu = (block_table.dim - 2.0) / 2.0
-        # Poles are not saved in the file so we have to reconstruct them
-        for k in range(1, block_table.k_max + 1):
-            # This program appears to use all the poles even when the scalars are identical
-            if k > 1 or l > 0:
-                poles.append(delta_pole(nu, k, l, 1))
-            if k % 2 == 0:
-                poles.append(delta_pole(nu, k // 2, l, 2))
-            if k <= l:
-                poles.append(delta_pole(nu, k, l, 3))
         block_table.table.append(PolynomialVector(derivatives, [l, 0], poles))
