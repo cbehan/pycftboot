@@ -1473,6 +1473,61 @@ class SDP:
         output = self.read_output(name = name)
         return [one] + output["y"]
 
+    def convert_spectrum_file(self, input_path, output_path, rescaling = 4 ** delta):
+        """
+        Reads a spectrum produced by the arXiv:1603.04444 script and outputs a file
+        with physical dimensions and OPE coefficients. Instead of a scaling
+        dimension, the original file reports the difference between the scaling
+        dimension and the gap. Instead of an OPE coefficient, the original file
+        reports the factor relating the OPE coefficient to the positive prefactor.
+        Note that this only works if `set_bound` has not been called since the
+        XML file was generated.
+
+        Parameters
+        ----------
+        input_path:  The path to the spectrum in Mathematica-like format.
+        output_path: The path desired for the file after the additive and
+                     multiplicative corrections have been performed.
+        rescaling:   [Optional] An expression, which may depend on `delta` and
+                     `ell`, for changing the convention used for OPE coefficients.
+                     Defaults to 4 ** delta.
+        """
+        in_file = open(input_path, 'r')
+        out_file = open(output_path, 'w')
+
+        out_file.write('{')
+        for j in range(0, len(self.table) + len(self.points)):
+            if j >= len(self.table):
+                shift = self.points[j - len(self.table)][1]
+                spin = self.points[j - len(self.table)][0][0]
+            else:
+                shift = self.bounds[j]
+                spin = self.table[j][0][0].label[0]
+            out_file.write(str(j) + " -> ")
+            line = next(in_file)[:-2].split("->")[1]
+            line = line.replace('{', '[').replace('}', ']')
+            line = re.sub("([0-9]+\.[0-9]+e?-?[0-9]+)", r"RealMPFR('\1', prec)", line)
+            exec("ops = " + line)
+            for o in range(0, len(ops)):
+                ops[o][0] = ops[o][0] + shift
+                if j >= len(self.table):
+                    prod = 1
+                else:
+                    prod = self.shifted_prefactor(self.table[j][0][0].poles, r_cross, ops[o][0], 0)
+                if "subs" in rescaling:
+                    prod *= rescaling.subs(delta, ops[o][0]).subs(ell, spin)
+                else:
+                    prod *= rescaling
+                for t in range(0, len(ops[o][1])):
+                    ops[o][1][t] = ops[o][1][t] / sqrt(prod)
+            ops_str = str(ops).replace('[', '{').replace(']', '}')
+            out_file.write(ops_str + ",\n")
+        # Copy the objective at the end
+        out_file.write(next(in_file))
+
+        in_file.close()
+        out_file.close()
+
     def extremal_dimensions(self, functional, spin_irrep, zero_threshold):
         """
         When a functional acts on `PolynomialVector`s, this finds approximate zeros
@@ -1522,7 +1577,7 @@ class SDP:
         for c in coeffs:
             pol_file.write(str(c) + "\n")
         pol_file.close()
-        os.system(unisolve_path + "-H1 -o" + str(prec) + " -Oc -Ga tmp.pol > tmp.spectrum")
+        os.system(unisolve_path + " -H1 -o" + str(prec) + " -Oc -Ga tmp.pol > tmp.spectrum")
         spec_file = open("tmp.spectrum", 'r')
         for c in coeffs:
             pair = next(spec_file).replace('(', '').replace(')', '').split(',')
