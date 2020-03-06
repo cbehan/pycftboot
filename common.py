@@ -23,6 +23,7 @@ else:
     sdpb_options = ["procsPerNode", "procGranularity", "verbosity"] + sdpb_options
     sdpb_defaults = ["4", "1", "1"] + sdpb_defaults
     mpirun_path = "/usr/bin/mpirun"
+unisolve_path = "/usr/bin/unisolve"
 
 def rf(x, n):
     """

@@ -9,7 +9,7 @@ If you use one of the mainstream Linux distributions, the following instructions
 
 1. Follow [the instructions](https://github.com/davidsd/sdpb/blob/master/Install.md#linux) for installing SDPB. When this is done, you will have [Boost](http://www.boost.org) and [GMP](https://gmplib.org) as well, so we will not need to discuss those further.
 
-2. Additional run-time dependencies are: [Sympy](http://www.sympy.org), [Numpy](http://www.numpy.org/) and [MPFR >= 4.0](http://www.mpfr.org/). The build-time dependencies are: [Cython](http://cython.org/) and [CMake >= 2.8](https://cmake.org/). You should install all of these. You will probably not need to compile them because most distros have these packages in their repositories.
+2. Additional run-time dependencies are: [Sympy](http://www.sympy.org) and [MPFR >= 4.0](http://www.mpfr.org/). The build-time dependencies are: [Cython](http://cython.org/) and [CMake >= 2.8](https://cmake.org/). You should install all of these. You will probably not need to compile them because most distros have these packages in their repositories.
 
 3. There are two dependencies left. One is [Symengine](https://github.com/symengine/symengine) which probably needs to be compiled. One commit that has been tested is ec460e7. An even better idea is to use the latest commit that has been [marked stable](https://github.com/symengine/symengine.py/blob/master/symengine_version.txt) for language bindings. To compile it with the recommended settings, run:
 

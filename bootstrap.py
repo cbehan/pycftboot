@@ -14,7 +14,6 @@ dimensions and transform in arbitrary representations of a global symmetry.
 """
 from __future__ import print_function
 import xml.dom.minidom
-import numpy.polynomial
 import time
 import re
 import os
@@ -1474,24 +1473,27 @@ class SDP:
         output = self.read_output(name = name)
         return [one] + output["y"]
 
-    def extremal_dimensions(self, functional, spin_irrep):
+    def extremal_dimensions(self, functional, spin_irrep, zero_threshold):
         """
-        This finds the zeros of the resulting expression when a functional acts on
-        `PolynomialVector`s. When the sum rule has matrices of `PolynomialVector`s,
-        these matrices should be marginally between positive definite and negative
-        definite when dimensions of operators in the extremal spectrum are
-        substituted. The returned list consists of dimensions for a given spin and
-        representation.
+        When a functional acts on `PolynomialVector`s, this finds approximate zeros
+        of the resulting expression with the `unisolve` executable. When the sum
+        rule has matrices of `PolynomialVector`s, sufficiently small local minima
+        of their determinants are returned. The list consists of dimensions for a
+        given spin and representation. The logic is a subset of that used in the
+        arXiv:1603.04444 script.
 
         Parameters
         ----------
-        functional: A list of functional components of the type returned by
-                    `solution_functional`.
-        spin_irrep: An ordered pair used to label the type of operator whose
-                    extremal dimensions are being found. The first entry is the spin
-                    and the second entry is the representation label found in
-                    `vector_types`.
+        functional:     A list of functional components of the type returned by
+                        `solution_functional`.
+        spin_irrep:     An ordered pair used to label the type of operator whose
+                        extremal dimensions are being found. The first entry is the
+                        spin and the second entry is the representation label found
+                        in `vector_types`.
+        zero_threshold: The threshold for identifying a real zero. The determinant
+                        over its second derivative must be less than this value.
         """
+        zeros = []
         entries = []
         l = self.get_table_index(spin_irrep)
 
@@ -1508,20 +1510,28 @@ class SDP:
                 entries.append(inner_product)
 
         matrix = DenseMatrix(size, size, entries)
-        determinant = matrix.det().expand()
-        coeffs = coefficients(determinant)
-        for i in range(0, len(coeffs)):
-            coeffs[i] = float(coeffs[i])
-        poly = numpy.polynomial.Polynomial(coeffs)
-        roots = poly.roots()
-
-        ret = []
-        bound = self.get_bound(spin_irrep)
-        for dim in roots:
-            # These might still be very approximate
-            if dim.imag > -1e-10 and dim.imag < 0.1 and dim.real > (bound - 0.01):
-                ret.append(dim.real)
-        return ret
+        det0 = matrix.det().expand()
+        det1 = det0.diff(delta)
+        det2 = det1.diff(delta)
+        coeffs = coefficients(det1)
+        # Pass output to unisolve
+        pol_file = open("tmp.pol", 'w')
+        pol_file.write("drf\n")
+        pol_file.write(str(prec) + "\n")
+        pol_file.write(str(len(coeffs) - 1) + "\n")
+        for c in coeffs:
+            pol_file.write(str(c) + "\n")
+        pol_file.close()
+        os.system(unisolve_path + "-H1 -o" + str(prec) + " -Oc -Ga tmp.pol > tmp.spectrum")
+        spec_file = open("tmp.spectrum", 'r')
+        for c in coeffs:
+            pair = next(spec_file).replace('(', '').replace(')', '').split(',')
+            real = RealMPFR(pair[0], prec)
+            imag = RealMPFR(pair[1], prec)
+            if imag < tiny and det0.subs(delta, real) / det2.subs(delta, real) < zero_threshold:
+                zeros.append(real)
+        spec_file.close()
+        return zeros
 
     def extremal_coefficients(self, dimensions, spin_irreps, nullity = 1):
         """
