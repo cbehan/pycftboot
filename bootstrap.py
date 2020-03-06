@@ -1353,12 +1353,15 @@ class SDP:
         else:
             return upper
 
-    def opemax(self, dimension, spin_irrep, name = "mySDP"):
+    def opemax(self, dimension, spin_irrep, reverse = False, vector = None, name = "mySDP"):
         """
-        Returns the maximum allowed squared length of the vector of OPE coefficients
+        Minimizes or maximizes the squared length of the vector of OPE coefficients
         involving an operator with a prescribed scaling dimension, spin and global
-        symmetry representation. It is best to compare several OPE coefficients so
-        that numerical artifacts cancel out.
+        symmetry representation. This results in a matrix produced by the action of
+        the functional found by `SDPB`. If a direction in OPE space has been passed
+        then the corresponding matrix element is returned. Otherwise, the matrix is
+        returned and it is up to the user to find the unconstrained minimum or
+        maximum value by diagonalizing it.
 
         Parameters
         ----------
@@ -1367,21 +1370,49 @@ class SDP:
         spin_irrep: An ordered pair of the type passed to `set_bound`. Used to label
                     the spin and representation of the operator whose OPE
                     coefficients have their length being bounded.
+        reverse:    [Optional] Whether to minimize a squared OPE coefficient vector
+                    instead of maximizing it. This only has a chance of working if
+                    the bounds are such that the specified operator is isolated.
+                    Defaults to `False`.
+        vector:     [Optional] A unit vector specifying the direction in OPE space
+                    being scanned if applicable. In a 2x2 scan, for instance, which
+                    is specified by one angle, the components of this vector will
+                    be the sine and the cosine. Defaults to `None`.
         name:       [Optional] Name of the XML file generated in the process without
                     any ".xml" at the end. Defaults to "mySDP".
         """
         l = self.get_table_index(spin_irrep)
         prod = self.shifted_prefactor(self.table[l][0][0].poles, r_cross, dimension, 0) * (-1)
+        size = len(self.table[l])
+        if reverse:
+            sign = -1
+        else:
+            sign = 1
+        if vector == None or len(vector) != size:
+            vec = [0] * size
+            vec[0] = sign
+        else:
+            vector_length = 0
+            for r in range(0, size):
+                vector_length += vector[r] ** 2
+            vector_length = sqrt(vector_length)
+            for s in range(0, size):
+                vec[s] = sign * vector[s] / vector_length
 
         norm = []
         for i in range(0, len(self.unit)):
-            norm.append(self.table[l][0][0].vector[i].subs(delta, dimension))
+            el = 0
+            for r in range(0, size):
+                for s in range(0, size):
+                    el += vec[r] * vec[s] * self.table[l][r][s].subs(delta, dimension)
+            norm.append(el * prod)
         functional = self.solution_functional(self.get_bound(spin_irrep), spin_irrep, self.unit, norm, name)
         output = self.read_output(name = name)
         primal_value = output["primalObjective"]
+        if size == 1 or vector != None:
+            return float(primal_value)
 
         # This primal value will be divided by 1 or something different if the matrix is not 1x1
-        size = len(self.table[l])
         outer_list = []
         for r in range(0, size):
             inner_list = []
@@ -1395,10 +1426,11 @@ class SDP:
 
                 inner_list.append(float(inner_product))
             outer_list.append(inner_list)
-
-        eigenvalues = numpy.linalg.eigvalsh(outer_list)
-        bound = float(primal_value) / min(eigenvalues)
-        return bound / prod
+        if reverse:
+            print("Divide " + str(float(primal_value)) + " by the maximum eigenvalue")
+        else:
+            print("Divide " + str(float(primal_value)) + " by the minimum eigenvalue")
+        return DenseMatrix(outer_list)
 
     def solution_functional(self, dimension, spin_irrep, obj = None, norm = None, name = "mySDP"):
         """
