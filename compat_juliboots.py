@@ -151,12 +151,12 @@ def juliboots_write(block_table, name):
 
         single_poles = []
         double_poles = []
-        for p in block_table.table[l].poles:
-            if p in single_poles:
-                single_poles.remove(p)
-                double_poles.append(p)
-            else:
+        gathered_poles = gather(block_table.table[l].poles)
+        for p in gathered_poles.keys():
+            if gathered_poles[p] == 1:
                 single_poles.append(p)
+            else:
+                double_poles.append(p)
 
         # The single pole part of the partial fraction decomposition is easier
         tab_file.write(str(len(single_poles)) + "\n")
@@ -168,7 +168,7 @@ def juliboots_write(block_table, name):
             factor = two ** (block_table.m_order[i] + 2 * block_table.n_order[i])
             for p in single_poles:
                 num = poly.subs(delta, p)
-                denom = omit_all(block_table.table[l].poles, [p], p)
+                denom = omit_all(block_table.table[l].poles, [p, p], p)
                 tab_file.write(str(factor * num / denom) + "\n")
 
         # The double pole part is identical
@@ -181,7 +181,7 @@ def juliboots_write(block_table, name):
             factor = two ** (block_table.m_order[i] + 2 * block_table.n_order[i])
             for p in double_poles:
                 num = poly.subs(delta, p)
-                denom = omit_all(block_table.table[l].poles, [p], p)
+                denom = omit_all(block_table.table[l].poles, [p, p], p)
                 tab_file.write(str(factor * num / denom) + "\n")
 
         alternate *= -1

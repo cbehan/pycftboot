@@ -417,18 +417,21 @@ class ConvolvedBlockTable:
 
             # Different blocks in the linear combination may be divided by different poles
             all_poles = []
+            pole_dict = {}
             for trip in content:
                 del_shift = trip[1]
                 ell_shift = trip[2] // step
                 if l + ell_shift >= 0:
-                    for p in block_table.table[l + ell_shift].poles:
-                        new = True
-                        for q in all_poles:
-                            if abs(float(p - del_shift - q)) < 1e-10:
-                                new = False
-                                break
-                        if new:
-                            all_poles.append(p - del_shift)
+                    gathered_poles = gather(block_table.table[l + ell_shift].poles)
+                    for p in gathered_poles.keys():
+                        ind = get_index_approx(pole_dict.keys(), p)
+                        if ind == -1:
+                            pole_dict[p] = gathered_poles[p]
+                        else:
+                            num = pole_dict[pole_dict.keys()[ind]]
+                            pole_dict[pole_dict.keys()[ind]] = max(num, gathered_poles[p])
+            for p in pole_dict.keys():
+                all_poles += [p] * pole_dict[p]
 
             for i in range(0, len(block_table.table[l].vector)):
                 entry = 0
@@ -442,14 +445,7 @@ class ConvolvedBlockTable:
 
                     coeff *= r_cross ** del_shift
                     if l + ell_shift >= 0:
-                        for p in all_poles:
-                            new = True
-                            for q in block_table.table[l + ell_shift].poles:
-                                if abs(float(p + del_shift - q)) < 1e-10:
-                                    new = False
-                                    break
-                            if new:
-                                coeff *= delta - p
+                        coeff *= omit_all(all_poles, block_table.table[l + ell_shift].poles, delta, del_shift)
                         entry += coeff * block_table.table[l + ell_shift].vector[i].subs(delta, delta + del_shift)
                 vector.append(entry.expand())
             combined_block_table.append(PolynomialVector(vector, [spin, 0], all_poles))
@@ -990,20 +986,18 @@ class SDP:
                twice which is the greatest amount of repetition in any real
                conformal block.
         """
-        single_poles = []
-        double_poles = []
         ret = zero
         if len(poles) == 0:
             return factorial(pos) / ((-log(r_cross)) ** (pos + 1))
 
-        for p in poles:
-            p = RealMPFR(str(p), prec)
-
-            if (p - shift) in single_poles:
-                single_poles.remove(p - shift)
-                double_poles.append(p - shift)
-            elif (p - shift) < 0:
+        single_poles = []
+        double_poles = []
+        gathered_poles = gather(poles)
+        for p in gathered_poles:
+            if gathered_poles[p] == 1:
                 single_poles.append(p - shift)
+            else:
+                double_poles.append(p - shift)
 
         for i in range(0, len(single_poles)):
             denom = one

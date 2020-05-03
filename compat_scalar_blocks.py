@@ -141,12 +141,12 @@ def scalar_blocks_write(block_table, name):
 
         single_poles = []
         double_poles = []
-        for p in block_table.table[l].poles:
-            if p in single_poles:
-                single_poles.remove(p)
-                double_poles.append(p)
-            else:
+        gathered_poles = gather(block_table.table[l].poles)
+        for p in gathered_poles.keys():
+            if gathered_poles[p] == 1:
                 single_poles.append(p)
+            else:
+                double_poles.append(p)
 
         block_file.write("singlePoles -> {")
         for p in range(0, len(single_poles)):

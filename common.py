@@ -43,24 +43,43 @@ def deepcopy(array):
         ret.append(list(el))
     return ret
 
-def get_index(array, element):
+def get_index(array, element, start = 0):
     """
     Finds where an element occurs in an array or -1 if not present.
     """
-    if element in array:
-        return array.index(element)
-    else:
-        return -1
+    for i in range(start, len(array)):
+        if array[i] == element:
+            return i
+    return -1
 
-def get_index_approx(array, element):
+def get_index_approx(array, element, start = 0):
     """
     Finds where an element numerically close to the one given occurs in an array
     or -1 if not present.
     """
-    for i in range(0, len(array)):
+    for i in range(start, len(array)):
         if abs(array[i] - element) < tiny:
             return i
     return -1
+
+def gather(array):
+    """
+    Finds (approximate) duplicates in a list and returns a dictionary that counts
+    the number of appearances.
+    """
+    ret = {}
+    backup = list(array)
+    while len(backup) > 0:
+        i = 0
+        hits = []
+        while i >= 0:
+            hits.append(i)
+            i = get_index_approx(backup, backup[i], i + 1)
+        ret[backup[0]] = len(hits)
+        hits.reverse()
+        for i in hits:
+            backup = backup[:i] + backup[i + 1:]
+    return ret
 
 def extract_power(term):
     """
@@ -127,15 +146,21 @@ def unitarity_bound(dim, spin):
     else:
         return dim + spin - 2
 
-def omit_all(poles, special_poles, var):
+def omit_all(poles, special_poles, var, shift = 0):
     """
     Instead of returning a product of poles where each pole is not in a special
     list, this returns a product where each pole is subtracted from some variable.
     """
     expression = 1
-    for p in poles:
-        if not p in special_poles:
-            expression *= (var - p)
+    gathered1 = gather(poles)
+    gathered0 = gather(special_poles)
+    for p in gathered1.keys():
+        ind = get_index_approx(gathered0.keys(), p + shift)
+        if ind == -1:
+            power = 0
+        else:
+            power = gathered0[gathered0.keys()[ind]]
+        expression *= (var - p) ** (gathered1[p] - power)
     return expression
 
 def dump_table_contents(block_table, name):
