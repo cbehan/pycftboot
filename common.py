@@ -16,14 +16,20 @@ ell = Symbol('ell')
 delta  = Symbol('delta')
 delta_ext = Symbol('delta_ext')
 
-sdpb_path = "/usr/bin/sdpb"
-if not os.path.isfile(sdpb_path):
-    for path in os.environ["PATH"].split(os.pathsep):
-        sdpb_path = os.path.join(path, "sdpb")
-        if os.path.isfile(sdpb_path):
-            break
-    else:
-        raise EnvironmentError("SDPB was not found on path.")
+def find_executable(name):
+  if os.path.isfile(name):
+      return name
+  else:
+      for path in os.environ["PATH"].split(os.pathsep):
+          test = os.path.join(path, name)
+          if os.path.isfile(test):
+              return test
+      else:
+          raise EnvironmentError("%s was not found on path." % name)
+
+sdpb_path = find_executable("sdpb")
+
+# Determine (major) version of SDPB
 proc = subprocess.Popen([sdpb_path, "--version"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 (stdout, _) = proc.communicate()
 if proc.returncode != 0:
@@ -41,8 +47,7 @@ if sdpb_version == 1:
 else:
     sdpb_options = ["procsPerNode", "procGranularity", "verbosity"] + sdpb_options
     sdpb_defaults = ["4", "1", "1"] + sdpb_defaults
-    mpirun_path = "/usr/bin/mpirun"
-unisolve_path = "/usr/bin/unisolve"
+    mpirun_path = find_executable("mpirun")
 
 def rf(x, n):
     """

@@ -1543,6 +1543,8 @@ class SDP:
         zero_threshold: The threshold for identifying a real zero. The determinant
                         over its second derivative must be less than this value.
         """
+        unisolve_path = find_executable("unisolve")
+
         zeros = []
         entries = []
         l = self.get_table_index(spin_irrep)
