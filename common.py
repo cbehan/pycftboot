@@ -1,3 +1,7 @@
+import os
+import re
+import subprocess
+
 cutoff = 0
 prec = 660
 dec_prec = int((3.0 / 10.0) * prec)
@@ -12,7 +16,6 @@ ell = Symbol('ell')
 delta  = Symbol('delta')
 delta_ext = Symbol('delta_ext')
 
-sdpb_version = 1
 sdpb_path = "/usr/bin/sdpb"
 if not os.path.isfile(sdpb_path):
     for path in os.environ["PATH"].split(os.pathsep):
@@ -21,6 +24,16 @@ if not os.path.isfile(sdpb_path):
             break
     else:
         raise EnvironmentError("SDPB was not found on path.")
+proc = subprocess.Popen([sdpb_path, "--version"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+(stdout, stderr) = proc.communicate()
+if proc.returncode != 0:
+    raise RuntimeError("Failed to invoke SDPB: %s" % sdpb_path)
+m = re.search(r"SDPB ([0-9])", str(stdout))
+if m is None:
+    print(stdout)
+    raise RuntimeError("Failed to retrieve SDPB version.")
+sdpb_version = int(m.group(1))
+
 sdpb_options = ["checkpointInterval", "maxIterations", "maxRuntime", "dualityGapThreshold", "primalErrorThreshold", "dualErrorThreshold", "initialMatrixScalePrimal", "initialMatrixScaleDual", "feasibleCenteringParameter", "infeasibleCenteringParameter", "stepLengthReduction", "maxComplementarity"]
 sdpb_defaults = ["3600", "500", "86400", "1e-30", "1e-30", "1e-30", "1e+20", "1e+20", "0.1", "0.3", "0.7", "1e+100"]
 if sdpb_version == 1:
