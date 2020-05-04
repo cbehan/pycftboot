@@ -14,6 +14,14 @@ delta_ext = Symbol('delta_ext')
 
 sdpb_version = 1
 sdpb_path = "/usr/bin/sdpb"
+if not os.path.isfile(sdpb_path):
+    import os
+    for path in os.environ["PATH"].split(os.pathsep):
+        sdpb_path = os.path.join(path, "sdpb")
+        if os.path.isfile(sdpb_path):
+            break
+    else:
+        raise EnvironmentError("SDPB was not found on PATH.")
 sdpb_options = ["checkpointInterval", "maxIterations", "maxRuntime", "dualityGapThreshold", "primalErrorThreshold", "dualErrorThreshold", "initialMatrixScalePrimal", "initialMatrixScaleDual", "feasibleCenteringParameter", "infeasibleCenteringParameter", "stepLengthReduction", "maxComplementarity"]
 sdpb_defaults = ["3600", "500", "86400", "1e-30", "1e-30", "1e-30", "1e+20", "1e+20", "0.1", "0.3", "0.7", "1e+100"]
 if sdpb_version == 1:
