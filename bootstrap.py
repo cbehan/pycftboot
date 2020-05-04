@@ -1252,7 +1252,7 @@ class SDP:
             subprocess.check_call([sdpb_path, "-s", name + ".xml", "--precision=" + str(prec), "--findPrimalFeasible", "--findDualFeasible", "--noFinalCheckpoint"] + self.options)
         else:
             ppn = self.get_option("procsPerNode")
-            subprocess.check_call([mpirun_path, "-n", ppn, sdpb_path, "-s", name, "--precision=" + str(prec), "--findPrimalFeasible", "--findDualFeasible"] + self.options)
+            subprocess.check_call([mpirun_path, "-n", ppn, sdpb_path, "-s", name, "--precision=" + str(prec), "--findPrimalFeasible", "--findDualFeasible", "--procsPerNode=" + str(ppn)] + self.options)
         output = self.read_output(name = name)
 
         terminate_reason = output["terminateReason"]
@@ -1464,7 +1464,7 @@ class SDP:
             subprocess.check_call([sdpb_path, "-s", name + ".xml", "--precision=" + str(prec), "--noFinalCheckpoint"] + self.options)
         else:
             ppn = self.get_option("procsPerNode")
-            subprocess.check_call([mpirun_path, "-n", ppn, sdpb_path, "-s", name, "--precision=" + str(prec), "--noFinalCheckpoint"] + self.options)
+            subprocess.check_call([mpirun_path, "-n", ppn, sdpb_path, "-s", name, "--precision=" + str(prec), "--noFinalCheckpoint", "--procsPerNode=" + str(ppn)] + self.options)
         output = self.read_output(name = name)
         return [one] + output["y"]
 
