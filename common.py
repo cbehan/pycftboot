@@ -25,12 +25,11 @@ if not os.path.isfile(sdpb_path):
     else:
         raise EnvironmentError("SDPB was not found on path.")
 proc = subprocess.Popen([sdpb_path, "--version"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-(stdout, stderr) = proc.communicate()
+(stdout, _) = proc.communicate()
 if proc.returncode != 0:
     raise RuntimeError("Failed to invoke SDPB: %s" % sdpb_path)
 m = re.search(r"SDPB ([0-9])", str(stdout))
 if m is None:
-    print(stdout)
     raise RuntimeError("Failed to retrieve SDPB version.")
 sdpb_version = int(m.group(1))
 
