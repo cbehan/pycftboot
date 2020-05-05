@@ -12,8 +12,9 @@ ell = Symbol('ell')
 delta  = Symbol('delta')
 delta_ext = Symbol('delta_ext')
 
-# Default path, used as first priority if it exists
+# Default paths, used as first priority if they exists
 sdpb_path = "/usr/bin/sdpb"
+mpirun_path = "/usr/bin/mpirun"
 
 def find_executable(name):
   if os.path.isfile(name):
@@ -51,7 +52,8 @@ if sdpb_version == 1:
 else:
     sdpb_options = ["procsPerNode", "procGranularity", "verbosity"] + sdpb_options
     sdpb_defaults = ["4", "1", "1"] + sdpb_defaults
-    mpirun_path = find_executable("mpirun")
+    if not os.path.isfile(mpirun_path):
+        mpirun_path = find_executable("mpirun")
 
 def rf(x, n):
     """
