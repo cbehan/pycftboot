@@ -1399,7 +1399,7 @@ class SDP:
             el = 0
             for r in range(0, size):
                 for s in range(0, size):
-                    el += vec[r] * vec[s] * self.table[l][r][s].subs(delta, dimension)
+                    el += vec[r] * vec[s] * self.table[l][r][s].vector[i].subs(delta, dimension)
             norm.append(el * prod)
         functional = self.solution_functional(self.get_bound(spin_irrep), spin_irrep, self.unit, norm, name)
         output = self.read_output(name = name)

@@ -17,15 +17,15 @@ sdpb_path = "/usr/bin/sdpb"
 mpirun_path = "/usr/bin/mpirun"
 
 def find_executable(name):
-  if os.path.isfile(name):
-      return name
-  else:
-      for path in os.environ["PATH"].split(os.pathsep):
-          test = os.path.join(path, name)
-          if os.path.isfile(test):
-              return test
-      else:
-          raise EnvironmentError("%s was not found on path." % name)
+    if os.path.isfile(name):
+        return name
+    else:
+        for path in os.environ["PATH"].split(os.pathsep):
+            test = os.path.join(path, name)
+            if os.path.isfile(test):
+                return test
+        else:
+            raise EnvironmentError("%s was not found on path." % name)
 
 # If default path doesn't apply, look for SDPB on user's PATH
 if not os.path.isfile(sdpb_path):
