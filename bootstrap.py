@@ -1253,6 +1253,8 @@ class SDP:
             subprocess.check_call([sdpb_path, "-s", name + ".xml", "--precision=" + str(prec), "--findPrimalFeasible", "--findDualFeasible", "--noFinalCheckpoint"] + self.options)
         else:
             ppn = self.get_option("procsPerNode")
+            ppn = str(max(1, int(ppn)))
+            self.set_option("procsPerNode", ppn)
             subprocess.check_call([mpirun_path, "-n", ppn, sdpb_path, "-s", name, "--precision=" + str(prec), "--findPrimalFeasible", "--findDualFeasible"] + self.options)
         output = self.read_output(name = name)
 
@@ -1465,6 +1467,8 @@ class SDP:
             subprocess.check_call([sdpb_path, "-s", name + ".xml", "--precision=" + str(prec), "--noFinalCheckpoint"] + self.options)
         else:
             ppn = self.get_option("procsPerNode")
+            ppn = str(max(1, int(ppn)))
+            self.set_option("procsPerNode", ppn)
             subprocess.check_call([mpirun_path, "-n", ppn, sdpb_path, "-s", name, "--precision=" + str(prec), "--noFinalCheckpoint"] + self.options)
         output = self.read_output(name = name)
         return [one] + output["y"]

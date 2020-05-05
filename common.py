@@ -51,7 +51,7 @@ if sdpb_version == 1:
     sdpb_defaults = ["4", "1e-40"] + sdpb_defaults
 else:
     sdpb_options = ["procsPerNode", "procGranularity", "verbosity"] + sdpb_options
-    sdpb_defaults = ["4", "1", "1"] + sdpb_defaults
+    sdpb_defaults = ["0", "1", "1"] + sdpb_defaults
     if not os.path.isfile(mpirun_path):
         mpirun_path = find_executable("mpirun")
 
