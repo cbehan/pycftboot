@@ -1196,7 +1196,7 @@ class SDP:
 
         if sdpb_version == 2:
             pvm2sdp_path = os.path.dirname(sdpb_path) + "/pvm2sdp"
-            os.spawnvp(os.P_WAIT, mpirun_path, ["mpirun", "-n", "1", pvm2sdp_path, str(prec), name + ".xml", name])
+            subprocess.check_call([mpirun_path, "-n", "1", pvm2sdp_path, str(prec), name + ".xml", name])
 
     def read_output(self, name = "mySDP"):
         """
@@ -1250,10 +1250,10 @@ class SDP:
         self.write_xml(obj, self.unit, name)
 
         if sdpb_version == 1:
-            os.spawnvp(os.P_WAIT, sdpb_path, ["sdpb", "-s", name + ".xml", "--precision=" + str(prec), "--findPrimalFeasible", "--findDualFeasible", "--noFinalCheckpoint"] + self.options)
+            subprocess.check_call([sdpb_path, "-s", name + ".xml", "--precision=" + str(prec), "--findPrimalFeasible", "--findDualFeasible", "--noFinalCheckpoint"] + self.options)
         else:
             ppn = self.get_option("procsPerNode")
-            os.spawnvp(os.P_WAIT, mpirun_path, ["mpirun", "-n", ppn, sdpb_path, "-s", name, "--precision=" + str(prec), "--findPrimalFeasible", "--findDualFeasible"] + self.options)
+            subprocess.check_call([mpirun_path, "-n", ppn, sdpb_path, "-s", name, "--precision=" + str(prec), "--findPrimalFeasible", "--findDualFeasible"] + self.options)
         output = self.read_output(name = name)
 
         terminate_reason = output["terminateReason"]
@@ -1462,10 +1462,10 @@ class SDP:
         self.set_bound(spin_irrep, old)
 
         if sdpb_version == 1:
-            os.spawnvp(os.P_WAIT, sdpb_path, ["sdpb", "-s", name + ".xml", "--precision=" + str(prec), "--noFinalCheckpoint"] + self.options)
+            subprocess.check_call([sdpb_path, "-s", name + ".xml", "--precision=" + str(prec), "--noFinalCheckpoint"] + self.options)
         else:
             ppn = self.get_option("procsPerNode")
-            os.spawnvp(os.P_WAIT, mpirun_path, ["mpirun", "-n", ppn, sdpb_path, "-s", name, "--precision=" + str(prec), "--noFinalCheckpoint"] + self.options)
+            subprocess.check_call([mpirun_path, "-n", ppn, sdpb_path, "-s", name, "--precision=" + str(prec), "--noFinalCheckpoint"] + self.options)
         output = self.read_output(name = name)
         return [one] + output["y"]
 
@@ -1852,9 +1852,9 @@ class SDP:
 
         # SDPB should now run quickly with default options
         if sdpb_version == 1:
-            os.spawnvp(os.P_WAIT, sdpb_path, ["sdpb", "-s", "tmp.xml", "--noFinalCheckpoint"])
+            subprocess.check_call([sdpb_path, "-s", "tmp.xml", "--noFinalCheckpoint"])
         else:
-            os.spawnvp(os.P_WAIT, mpirun_path, ["mpirun", "-n", "1", sdpb_path, "-s", "tmp.xml", "--noFinalCheckpoint"])
+            subprocess.check_call([mpirun_path, "-n", "1", sdpb_path, "-s", "tmp.xml", "--noFinalCheckpoint"])
         output = self.read_output(name = "tmp")
         solution = output["y"]
         solution = solution[zeros + nullity:]
