@@ -17,6 +17,8 @@ import xml.dom.minidom
 import time
 import re
 import os
+import subprocess
+
 
 # Regular sympy is slow but we only use it for quick access to Gegenbauer polynomials
 # Even this could be removed since our conformal block code is needlessly general
@@ -1542,6 +1544,8 @@ class SDP:
         zero_threshold: The threshold for identifying a real zero. The determinant
                         over its second derivative must be less than this value.
         """
+        unisolve_path = find_executable("unisolve")
+
         zeros = []
         entries = []
         l = self.get_table_index(spin_irrep)

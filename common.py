@@ -12,8 +12,38 @@ ell = Symbol('ell')
 delta  = Symbol('delta')
 delta_ext = Symbol('delta_ext')
 
-sdpb_version = 1
+# Default paths, used as first priority if they exists
 sdpb_path = "/usr/bin/sdpb"
+mpirun_path = "/usr/bin/mpirun"
+
+def find_executable(name):
+  if os.path.isfile(name):
+      return name
+  else:
+      for path in os.environ["PATH"].split(os.pathsep):
+          test = os.path.join(path, name)
+          if os.path.isfile(test):
+              return test
+      else:
+          raise EnvironmentError("%s was not found on path." % name)
+
+# If default path doesn't apply, look for SDPB on user's PATH
+if not os.path.isfile(sdpb_path):
+    sdpb_path = find_executable("sdpb")
+
+# Determine (major) version of SDPB
+proc = subprocess.Popen([sdpb_path, "--version"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+(stdout, _) = proc.communicate()
+if proc.returncode != 0:
+    # Assume that this is version 1.x, which didn't support --version
+    sdpb_version = 1
+else:
+    # Otherwise parse the output of --version
+    m = re.search(r"SDPB ([0-9])", str(stdout))
+    if m is None:
+        raise RuntimeError("Failed to retrieve SDPB version.")
+    sdpb_version = int(m.group(1))
+
 sdpb_options = ["checkpointInterval", "maxIterations", "maxRuntime", "dualityGapThreshold", "primalErrorThreshold", "dualErrorThreshold", "initialMatrixScalePrimal", "initialMatrixScaleDual", "feasibleCenteringParameter", "infeasibleCenteringParameter", "stepLengthReduction", "maxComplementarity"]
 sdpb_defaults = ["3600", "500", "86400", "1e-30", "1e-30", "1e-30", "1e+20", "1e+20", "0.1", "0.3", "0.7", "1e+100"]
 if sdpb_version == 1:
@@ -22,8 +52,8 @@ if sdpb_version == 1:
 else:
     sdpb_options = ["procsPerNode", "procGranularity", "verbosity"] + sdpb_options
     sdpb_defaults = ["4", "1", "1"] + sdpb_defaults
-    mpirun_path = "/usr/bin/mpirun"
-unisolve_path = "/usr/bin/unisolve"
+    if not os.path.isfile(mpirun_path):
+        mpirun_path = find_executable("mpirun")
 
 def rf(x, n):
     """
