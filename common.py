@@ -1,7 +1,3 @@
-import os
-import re
-import subprocess
-
 cutoff = 0
 prec = 660
 dec_prec = int((3.0 / 10.0) * prec)
@@ -16,6 +12,9 @@ ell = Symbol('ell')
 delta  = Symbol('delta')
 delta_ext = Symbol('delta_ext')
 
+# Default path, used as first priority if it exists
+sdpb_path = "/usr/bin/sdpb"
+
 def find_executable(name):
   if os.path.isfile(name):
       return name
@@ -27,17 +26,22 @@ def find_executable(name):
       else:
           raise EnvironmentError("%s was not found on path." % name)
 
-sdpb_path = find_executable("sdpb")
+# If default path doesn't apply, look for SDPB on user's PATH
+if not os.path.isfile(sdpb_path):
+    sdpb_path = find_executable("sdpb")
 
 # Determine (major) version of SDPB
 proc = subprocess.Popen([sdpb_path, "--version"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 (stdout, _) = proc.communicate()
 if proc.returncode != 0:
-    raise RuntimeError("Failed to invoke SDPB: %s" % sdpb_path)
-m = re.search(r"SDPB ([0-9])", str(stdout))
-if m is None:
-    raise RuntimeError("Failed to retrieve SDPB version.")
-sdpb_version = int(m.group(1))
+    # Assume that this is version 1.x, which didn't support --version
+    sdpb_version = 1
+else:
+    # Otherwise parse the output of --version
+    m = re.search(r"SDPB ([0-9])", str(stdout))
+    if m is None:
+        raise RuntimeError("Failed to retrieve SDPB version.")
+    sdpb_version = int(m.group(1))
 
 sdpb_options = ["checkpointInterval", "maxIterations", "maxRuntime", "dualityGapThreshold", "primalErrorThreshold", "dualErrorThreshold", "initialMatrixScalePrimal", "initialMatrixScaleDual", "feasibleCenteringParameter", "infeasibleCenteringParameter", "stepLengthReduction", "maxComplementarity"]
 sdpb_defaults = ["3600", "500", "86400", "1e-30", "1e-30", "1e-30", "1e+20", "1e+20", "0.1", "0.3", "0.7", "1e+100"]

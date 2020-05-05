@@ -19,6 +19,7 @@ import re
 import os
 import subprocess
 
+
 # Regular sympy is slow but we only use it for quick access to Gegenbauer polynomials
 # Even this could be removed since our conformal block code is needlessly general
 from symengine.lib.symengine_wrapper import *
@@ -995,9 +996,9 @@ class SDP:
         double_poles = []
         gathered_poles = gather(poles)
         for p in gathered_poles:
-            if gathered_poles[p] == 1:
+            if gathered_poles[p] == 1 and p < shift:
                 single_poles.append(p - shift)
-            else:
+            elif p < shift:
                 double_poles.append(p - shift)
 
         for i in range(0, len(single_poles)):
