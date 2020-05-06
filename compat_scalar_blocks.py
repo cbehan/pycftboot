@@ -60,13 +60,11 @@ def scalar_blocks_read(block_table, name):
             block_table.l_max = l
 
         derivatives = []
-        vector_with_poles = open(full, 'r').read().replace('{', '').replace('}', '').split("Poles -> ")
-        if len(vector_with_poles) < 3:
+        vector_with_poles = open(full, 'r').read().split(" shiftedPoles -> ")
+        if len(vector_with_poles) < 2:
             print("Please rerun scalar_blocks with --output-poles")
             return
-        vector = vector_with_poles[0]
-        single_poles = vector_with_poles[1].split(',\n')
-        double_poles = vector_with_poles[2].split(',\n')
+        vector = vector_with_poles[0].replace('{', '').replace('}', '')
         vector = re.sub("abDeriv\[[0-9]+,[0-9]+\]", "", vector).split(',\n')[:-1]
         for el in vector:
             poly = 0
@@ -82,29 +80,25 @@ def scalar_blocks_read(block_table, name):
             derivatives.append(poly.subs(delta, delta - block_table.dim - l + 2).expand())
 
         poles = []
-        for p in range(0, len(single_poles)):
-            pole = single_poles[p]
-            if p != 0:
-                pole = pole[17:]
-            if pole == '' or pole == '\n':
-                continue
-            pole = RealMPFR(pole, prec)
-            if l == 0 and abs(pole) < tiny:
-                remove_zero = 1
-                continue
-            poles.append(pole)
-        for p in range(0, len(double_poles)):
-            pole = double_poles[p]
-            if p != 0:
-                pole = pole[17:]
-            if pole == '' or pole == '\n':
-                continue
-            pole = RealMPFR(pole, prec)
-            if l == 0 and abs(pole) < tiny:
-                remove_zero = 2
-                continue
-            poles.append(pole)
-            poles.append(pole)
+        passed_halfway = False
+        shifted_poles = vector_with_poles[1].split(',\n')
+        for p in range(0, len(shifted_poles)):
+            line = shifted_poles[p].strip().replace(',', '')
+            if p > 0 and '{' in line:
+                passed_halfway = True
+            line = line.replace('{', '').replace('}', '')
+            pole = RealMPFR(line, prec)
+            if passed_halfway:
+                if l == 0 and abs(pole) < tiny:
+                    remove_zero = 2
+                    continue
+                poles.append(pole)
+                poles.append(pole)
+            else:
+                if l == 0 and abs(pole) < tiny:
+                    remove_zero = 1
+                    continue
+                poles.append(pole)
 
         # The block for scalar exchange should not give zero for the identity
         if remove_zero > 0:
@@ -148,15 +142,15 @@ def scalar_blocks_write(block_table, name):
             else:
                 double_poles.append(p)
 
-        block_file.write("singlePoles -> {")
+        block_file.write("shiftedPoles -> {{")
         for p in range(0, len(single_poles)):
             block_file.write(str(single_poles[p]))
             if p < len(single_poles) - 1:
                 block_file.write(",\n                 ")
-        block_file.write("},\n doublePoles -> {")
+        block_file.write("},\n          {")
         for p in range(0, len(double_poles)):
             block_file.write(str(double_poles[p]))
             if p < len(double_poles) - 1:
                 block_file.write(",\n                 ")
-        block_file.write('}}')
+        block_file.write('}}}')
         block_file.close()
