@@ -14,11 +14,10 @@ dimensions and transform in arbitrary representations of a global symmetry.
 """
 from __future__ import print_function
 import xml.dom.minidom
+import subprocess
 import time
 import re
 import os
-import subprocess
-
 
 # Regular sympy is slow but we only use it for quick access to Gegenbauer polynomials
 # Even this could be removed since our conformal block code is needlessly general
@@ -1579,15 +1578,14 @@ class SDP:
         for c in coeffs:
             pol_file.write(str(c) + "\n")
         pol_file.close()
-        os.system(unisolve_path + " -H1 -o" + str(prec) + " -Oc -Ga tmp.pol > tmp.spectrum")
-        spec_file = open("tmp.spectrum", 'r')
-        for c in coeffs:
-            pair = next(spec_file).replace('(', '').replace(')', '').split(',')
+        spec = subprocess.check_output([unisolve_path, "-H1", "-o" + str(prec), "-Oc", "-Ga", "tmp.pol"])
+        spec_lines = spec.split('\n')[:-1]
+        for line in spec_lines:
+            pair = line.replace('(', '').replace(')', '').split(',')
             real = RealMPFR(pair[0], prec)
             imag = RealMPFR(pair[1], prec)
             if imag < tiny and det0.subs(delta, real) / det2.subs(delta, real) < zero_threshold:
                 zeros.append(real)
-        spec_file.close()
         return zeros
 
     def extremal_coefficients(self, dimensions, spin_irreps, nullity = 1):
