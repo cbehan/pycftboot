@@ -429,8 +429,9 @@ class ConvolvedBlockTable:
                         if ind == -1:
                             pole_dict[p] = gathered_poles[p]
                         else:
-                            num = pole_dict[pole_dict.keys()[ind]]
-                            pole_dict[pole_dict.keys()[ind]] = max(num, gathered_poles[p])
+                            pole_dict_index = index_iter(pole_dict.keys(), ind)
+                            num = pole_dict[pole_dict_index]
+                            pole_dict[pole_dict_index] = max(num, gathered_poles[p])
             for p in pole_dict.keys():
                 all_poles += [p] * pole_dict[p]
 
