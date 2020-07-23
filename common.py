@@ -1,3 +1,5 @@
+import itertools
+
 cutoff = 0
 prec = 660
 dec_prec = int((3.0 / 10.0) * prec)
@@ -73,12 +75,18 @@ def deepcopy(array):
         ret.append(list(el))
     return ret
 
+def index_iter(iter, n):
+    """
+    Return the nth element of an iterator
+    """
+    return next(itertools.islice(iter, n, None))
+
 def get_index(array, element, start = 0):
     """
     Finds where an element occurs in an array or -1 if not present.
     """
-    for i in range(start, len(array)):
-        if array[i] == element:
+    for i, v in itertools.islice(enumerate(array), start, None):
+        if v == element:
             return i
     return -1
 
@@ -87,8 +95,9 @@ def get_index_approx(array, element, start = 0):
     Finds where an element numerically close to the one given occurs in an array
     or -1 if not present.
     """
-    for i in range(start, len(array)):
-        if abs(array[i] - element) < tiny:
+
+    for i, v in itertools.islice(enumerate(array), start, None):
+        if abs(v - element) < tiny:
             return i
     return -1
 
@@ -189,7 +198,7 @@ def omit_all(poles, special_poles, var, shift = 0):
         if ind == -1:
             power = 0
         else:
-            power = gathered0[gathered0.keys()[ind]]
+            power = gathered0[index_iter(gathered0.keys(), ind)]
         expression *= (var - p) ** (gathered1[p] - power)
     return expression
 
