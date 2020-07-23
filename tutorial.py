@@ -23,7 +23,7 @@ print("1. 3D Ising model (even sector only).")
 print("2. 3D O(3) model.")
 print("3. 3D Ising model (odd sector as well).")
 print("4. 4D N = 1 supersymmetric model.")
-choice = input("Choice: ")
+choice = int(input("Choice: "))
 
 if choice == 1:
     # Concentrates on external scalars of 0.518, close to the 3D Ising value.
