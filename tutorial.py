@@ -7,7 +7,7 @@ be found by reading the other sections or the documentation strings of PyCFTBoot
 These can be accessed by running `pydoc -g`.
 """
 # Imports the package
-import bootstrap
+import pycftboot as bootstrap
 # The conformal blocks needed for a given run are calculated as a sum over poles.
 # Demand that poles with small residues are approximated by poles with large ones.
 bootstrap.cutoff = 1e-10

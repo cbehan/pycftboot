@@ -30,11 +30,12 @@ if have_mpfr == False:
 
 # Relocate some self-contained classes to separate files
 # Importing them would not make sense because they refer back to things in this file
-exec(open("common.py").read())
-exec(open("compat_juliboots.py").read())
-exec(open("compat_scalar_blocks.py").read())
-exec(open("blocks1.py").read())
-exec(open("blocks2.py").read())
+src_path = os.path.dirname(os.path.abspath(__file__))
+exec(open(src_path + "/common.py").read())
+exec(open(src_path + "/compat_juliboots.py").read())
+exec(open(src_path + "/compat_scalar_blocks.py").read())
+exec(open(src_path + "/blocks1.py").read())
+exec(open(src_path + "/blocks2.py").read())
 
 # MPFR's implementation of the incomplete gamma function is still not optimal
 # It is therefore worthwhile to test whether the following block improves performance
