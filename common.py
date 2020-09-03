@@ -1,5 +1,3 @@
-import itertools
-
 cutoff = 0
 prec = 660
 dec_prec = int((3.0 / 10.0) * prec)
@@ -77,7 +75,7 @@ def deepcopy(array):
 
 def index_iter(iter, n):
     """
-    Return the nth element of an iterator
+    Returns the nth element of an iterator.
     """
     return next(itertools.islice(iter, n, None))
 

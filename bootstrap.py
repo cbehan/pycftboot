@@ -15,6 +15,7 @@ dimensions and transform in arbitrary representations of a global symmetry.
 from __future__ import print_function
 import xml.dom.minidom
 import subprocess
+import itertools
 import time
 import re
 import os
