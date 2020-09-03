@@ -55,7 +55,7 @@ if choice == 1:
     # The 0.7 and 1.7 are our guesses for scalars, not some other type of operator.
     channel = 0
     # Calls SDPB to compute the bound.
-    result = sdp.bisect(lower, upper, tol, channel)
+    result = sdp.bisect(lower, upper, tol, channel, name = "tutorial_1a")
     cprint("If crossing symmetry and unitarity hold, the maximum gap we can have for Z2-even scalars is: " + str(result))
     cprint("Checking if (" + str(dim_phi) + ", " + str(result) + ") is still allowed if we require only one relevant Z2-even scalar...")
     # States that the continuum of internal scalars being checked starts at 3.
@@ -63,7 +63,7 @@ if choice == 1:
     # States that the point near the boundary that we found should be the one exception.
     sdp.add_point(channel, result)
     # Calls SDPB to check.
-    allowed = sdp.iterate()
+    allowed = sdp.iterate(name = "tutorial_1b")
     if (allowed):
         cprint("Yes")
     else:
@@ -74,7 +74,7 @@ if choice == 1:
     # Adds a different one at a smaller dimension.
     sdp.add_point(channel, 1.2)
     # Checks again.
-    allowed = sdp.iterate()
+    allowed = sdp.iterate(name = "tutorial_1c")
     if (allowed):
         cprint("Yes")
     else:
@@ -109,19 +109,19 @@ if choice == 2:
     sdp1 = bootstrap.SDP(dim_phi1, [table2, table3], vector_types = info)
     # This time channel needs two labels.
     channel1 = [0, "singlet"]
-    result = sdp1.bisect(0.7, 1.8, 0.01, channel1)
+    result = sdp1.bisect(0.7, 1.8, 0.01, channel1, name = "tutorial_2a")
     cprint("If crossing symmetry and unitarity hold, the maximum gap we can have for singlet scalars is: " + str(result))
     cprint("Bounding the OPE coefficient for the stress-energy tensor...")
     # The spin is now 2 and the dimension is 3.
     channel2 = [2, "singlet"]
     dim_t = dim
     # Calls SDPB to return a squared OPE coefficient bound.
-    result1 = sdp1.opemax(dim_t, channel2)
+    result1 = sdp1.opemax(dim_t, channel2, name = "tutorial_2b")
     cprint("Bounding the same coefficient in the free theory to get a point of comparison...")
     # Sets up a new SDP where this time, the external scalar has a dimension very close to unitarity.
     dim_phi2 = 0.5001
     sdp2 = bootstrap.SDP(dim_phi2, [table2, table3], vector_types = info)
-    result2 = sdp2.opemax(dim_t, channel2)
+    result2 = sdp2.opemax(dim_t, channel2, name = "tutorial_2c")
     # Uses the central charge formula which follows from the Ward identity to compute the ratio.
     ratio = ((result2 / result1) * (dim_phi1 / dim_phi2)) ** 2
     cprint("The central charge of the theory at " + str(dim_phi1) + " is " + str(ratio) + " times the free one.")
@@ -180,7 +180,7 @@ if choice == 3:
     sdp1.add_point([0, "z2-odd-l-even"], pair1[0])
     # In this problem, a ruled out point may have primal error smaller than dual error unless we run for much longer.
     sdp1.set_option("dualErrorThreshold", 1e-15)
-    allowed = sdp1.iterate()
+    allowed = sdp1.iterate(name = "tutorial_3a")
     if (allowed):
         cprint("Yes")
     else:
@@ -193,7 +193,7 @@ if choice == 3:
     sdp2.set_bound([0, "z2-odd-l-even"], dim)
     sdp2.add_point([0, "z2-odd-l-even"], pair2[0])
     sdp2.set_option("dualErrorThreshold", 1e-15)
-    allowed = sdp2.iterate()
+    allowed = sdp2.iterate(name = "tutorial_3b")
     if (allowed):
         cprint("Yes")
     else:
@@ -243,5 +243,5 @@ if choice == 4:
         sdp.add_point([l, "symmetric"], 2 * dim_phi + l)
         sdp.set_bound([l, "symmetric"], abs(2 * dim_phi - 3) + 3 + l)
     # Does a long test.
-    result = sdp.bisect(3.0, 4.25, 0.01, [0, "singlet"])
+    result = sdp.bisect(3.0, 4.25, 0.01, [0, "singlet"], name = "tutorial_4")
     cprint("If crossing symmetry and unitarity hold, the maximum gap we can have for singlet scalars is: " + str(result))
