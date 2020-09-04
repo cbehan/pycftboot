@@ -1380,22 +1380,23 @@ class SDP:
                     any ".xml" at the end. Defaults to "mySDP".
         """
         l = self.get_table_index(spin_irrep)
-        prod = self.shifted_prefactor(self.table[l][0][0].poles, r_cross, dimension, 0) * (-1)
         size = len(self.table[l])
         if reverse:
             sign = -1
         else:
             sign = 1
+        prod = self.shifted_prefactor(self.table[l][0][0].poles, r_cross, dimension, 0) * sign
+
         if vector == None or len(vector) != size:
             vec = [0] * size
-            vec[0] = sign
+            vec[0] = 1
         else:
             vector_length = 0
             for r in range(0, size):
                 vector_length += vector[r] ** 2
             vector_length = sqrt(vector_length)
             for s in range(0, size):
-                vec[s] = sign * vector[s] / vector_length
+                vec[s] = vector[s] / vector_length
 
         norm = []
         for i in range(0, len(self.unit)):
@@ -1408,7 +1409,7 @@ class SDP:
         output = self.read_output(name = name)
         primal_value = output["primalObjective"]
         if size == 1 or vector != None:
-            return float(primal_value)
+            return float(primal_value) * (-1)
 
         # This primal value will be divided by 1 or something different if the matrix is not 1x1
         outer_list = []
