@@ -1262,7 +1262,7 @@ class SDP:
         terminate_reason = output["terminateReason"]
         return terminate_reason == "found primal feasible solution"
 
-    def bisect(self, lower, upper, threshold, spin_irrep, isolated = False, reverse = False, bias = None):
+    def bisect(self, lower, upper, threshold, spin_irrep, isolated = False, reverse = False, bias = None, name = "mySDP"):
         """
         Uses a binary search to find the maximum allowed gap in a particular type
         of operator before the CFT stops existing. The allowed value closest to the
@@ -1325,7 +1325,7 @@ class SDP:
             if checkpoints and sdpb_version == 1:
                 result = self.iterate(name = str(start))
             else:
-                result = self.iterate()
+                result = self.iterate(name = name)
             end = time.time()
             if int(end - start) > int(self.get_option("checkpointInterval")):
                 checkpoints = True
