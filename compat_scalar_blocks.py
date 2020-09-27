@@ -87,7 +87,7 @@ def scalar_blocks_read(block_table, name):
             if p > 0 and '{' in line:
                 passed_halfway = True
             line = line.replace('{', '').replace('}', '')
-            pole = RealMPFR(line, prec)
+            pole = RealMPFR(line, prec) + block_table.dim + l - 2
             if passed_halfway:
                 if l == 0 and abs(pole) < tiny:
                     remove_zero = 2
