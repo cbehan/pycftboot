@@ -89,13 +89,13 @@ def scalar_blocks_read(block_table, name):
             line = line.replace('{', '').replace('}', '')
             pole = RealMPFR(line, prec) + RealMPFR(str(block_table.dim + l - 2), prec)
             if passed_halfway:
-                if l == 0 and abs(pole) < tiny:
+                if l == 0 and abs(pole) < tiny and abs(block_table.delta_12) < tiny and abs(block_table.delta_34) < tiny:
                     remove_zero = 2
                     continue
                 poles.append(pole)
                 poles.append(pole)
             else:
-                if l == 0 and abs(pole) < tiny:
+                if l == 0 and abs(pole) < tiny and abs(block_table.delta_12) < tiny and abs(block_table.delta_34) < tiny:
                     remove_zero = 1
                     continue
                 poles.append(pole)
