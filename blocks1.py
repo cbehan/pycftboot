@@ -47,7 +47,9 @@ def delta_residue(nu, k, l, delta_12, delta_34, series):
 
     if series == 1:
         ret = - ((k * (-4) ** k) / (factorial(k) ** 2)) * rf((1 - k + delta_12) / two, k) * rf((1 - k + delta_34) / two, k)
-        if l == 0 and nu == 0:
+        if ret == 0:
+            return ret
+        elif l == 0 and nu == 0:
             # Take l to 0, then nu
             return ret * 2
         else:
@@ -58,7 +60,7 @@ def delta_residue(nu, k, l, delta_12, delta_34, series):
         ret *= rf(-nu, k + 1) / ((rf((l + nu - k + 1) / 2, k) * rf((l + nu - k) / 2, k)) ** 2)
 
         for f in factors:
-            ret *= rf((f - k) / 2, k)
+            ret *= rf((f - k) / two, k)
         return ret
     else:
         return - ((k * (-4) ** k) / (factorial(k) ** 2)) * (rf(1 + l - k, k) * rf((1 - k + delta_12) / two, k) * rf((1 - k + delta_34) / two, k) / rf(1 + nu + l - k, k))
