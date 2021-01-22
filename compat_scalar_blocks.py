@@ -22,14 +22,14 @@ def scalar_blocks_read(block_table, name):
     delta12_negative = info.split("-delta12--")
     delta12_positive = info.split("-delta12-")
     if len(delta12_negative) > 1:
-        block_table.delta_12 = float(delta12_negative[1].split('-')[0])
+        block_table.delta_12 = -float(delta12_negative[1].split('-')[0])
         info = info.replace("-delta12--", "-delta12-")
     else:
         block_table.delta_12 = float(delta12_positive[1].split('-')[0])
     delta34_negative = info.split("-delta34--")
     delta34_positive = info.split("-delta34-")
     if len(delta34_negative) > 1:
-        block_table.delta_34 = float(delta34_negative[1].split('-')[0])
+        block_table.delta_34 = -float(delta34_negative[1].split('-')[0])
         info = info.replace("-delta34--", "-delta34-")
     else:
         block_table.delta_34 = float(delta34_positive[1].split('-')[0])
