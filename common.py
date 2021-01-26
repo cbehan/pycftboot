@@ -60,6 +60,8 @@ def rf(x, n):
     Implements the rising factorial or Pochhammer symbol.
     """
     ret = 1
+    if n < 0:
+        return rf(x - abs(n), abs(n)) ** (-1)
     for k in range(0, n):
         ret *= x + k
     return ret

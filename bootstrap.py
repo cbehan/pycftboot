@@ -606,15 +606,19 @@ class SDP:
 
             for i in range(0, len(chosen_tab.table[0].vector)):
                 unit = 0
+                m = chosen_tab.m_order[i]
+                n = chosen_tab.n_order[i]
                 for r in range(0, len(matrix)):
                     for s in range(0, len(matrix[r])):
                         quad = matrix[r][s]
-                        tab = conv_table_list[quad[1]]
-                        factor = self.shifted_prefactor(tab.table[0].poles, r_cross, 0, 0)
-                        unit += factor * quad[0] * tab.table[0].vector[i].subs(delta, 0).subs(delta_ext, (dim_list[quad[2]] + dim_list[quad[3]]) / 2.0)
+                        param = RealMPFR("0.5", prec) * (dim_list[quad[2]] + dim_list[quad[3]])
+                        #tab = conv_table_list[quad[1]]
+                        #factor = self.shifted_prefactor(tab.table[0].poles, r_cross, 0, 0)
+                        #unit += factor * quad[0] * tab.table[0].vector[i].subs(delta, 0).subs(delta_ext, (dim_list[quad[2]] + dim_list[quad[3]]) / 2.0)
+                        unit += 2 * quad[0] * (RealMPFR("0.25", prec) ** param) * rf(-param, n) * rf(2 * n - 2 * param, m) / (factorial(m) * factorial(n))
 
-                self.m_order.append(chosen_tab.m_order[i])
-                self.n_order.append(chosen_tab.n_order[i])
+                self.m_order.append(m)
+                self.n_order.append(n)
                 self.unit.append(unit)
 
         # Looping over types and spins gives "0 - S", "0 - T", "1 - A" and so on
