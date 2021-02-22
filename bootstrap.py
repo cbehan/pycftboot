@@ -37,8 +37,8 @@ exec(open("compat_scalar_blocks.py").read())
 exec(open("blocks1.py").read())
 exec(open("blocks2.py").read())
 
-# MPFR's implementation of the incomplete gamma function is still not optimal
-# It is therefore worthwhile to test whether the following block improves performance
+# MPFR has no trouble calling gamma_inc quickly when the first argument is zero
+# In case we need to go back to using non-zero values, the following might be faster
 """
 import mpmath
 mpmath.mp.dps = dec_prec
@@ -886,8 +886,23 @@ class SDP:
                     expression = polynomial_vector[n].expand()
                     degree = max(degree, len(coefficients(expression)) - 1)
 
+        # Separate the poles and associate each with an uppergamma function
+        # This avoids computing these same functions for each d in the loop below
+        single_poles = []
+        double_poles = []
+        single_gammas = []
+        double_gammas = []
+        gathered_poles = gather(poles)
+        for p in gathered_poles:
+            if gathered_poles[p] == 1 and p < delta_min:
+                single_poles.append(p - delta_min)
+                single_gammas.append(uppergamma(zero, (p - delta_min) * log(r_cross)))
+            elif p < delta_min:
+                double_poles.append(p - delta_min)
+                double_gammas.append(uppergamma(zero, (p - delta_min) * log(r_cross)))
+
         for d in range(0, 2 * (degree // 2) + 1):
-            result = self.integral(d, delta_min, poles)
+            result = (r_cross ** delta_min) * self.integral(d, single_poles, double_poles, single_gammas, double_gammas)
             bands.append(result)
         for r in range(0, (degree // 2) + 1):
             new_entries = []
@@ -978,7 +993,7 @@ class SDP:
             product *= x - (p - shift)
         return (base ** (x + shift)) / product
 
-    def integral(self, pos, shift, poles):
+    def integral(self, pos, single_poles, double_poles, single_gammas, double_gammas):
         """
         Returns the inner product of two monic monomials with respect to the
         positive measure prefactor that turns a `PolynomialVector` into a rational
@@ -986,47 +1001,49 @@ class SDP:
 
         Parameters
         ----------
-        pos:   The sum of the degrees of the two monomials.
-        shift: An amount by which to shift `delta`, the variable of integration.
-        poles: The roots of the prefactor's denominator, often from the `poles`
-               attribute of a `PolynomialVector`. Poles may be repeated up to
-               twice which is the greatest amount of repetition in any real
-               conformal block.
+        pos:           The sum of the degrees of the two monomials.
+        single_poles:  The roots of the prefactor's denominator which appear
+                       linearly.
+        double_poles:  The roots of the prefactor's denominator which appear
+                       quadratically. This is where the pole order stops for a
+                       physical conformal block.
+        single_gammas: A list representing the image of `single_poles` under the
+                       map which sends x to uppergamma(0, x * log(r_cross)).
+        double_gammas: The same thing for the double poles.
         """
         ret = zero
-        if len(poles) == 0:
+        if len(single_poles) == 0 and len(double_poles) == 0:
             return factorial(pos) / ((-log(r_cross)) ** (pos + 1))
-
-        single_poles = []
-        double_poles = []
-        gathered_poles = gather(poles)
-        for p in gathered_poles:
-            if gathered_poles[p] == 1 and p < shift:
-                single_poles.append(p - shift)
-            elif p < shift:
-                double_poles.append(p - shift)
 
         for i in range(0, len(single_poles)):
             denom = one
             pole = single_poles[i]
             other_single_poles = single_poles[:i] + single_poles[i + 1:]
+            gamma_val = ((-1) ** pos) * (r_cross ** pole) * single_gammas[i]
+            for j in range(0, pos):
+                gamma_val += ((-1) ** j) * factorial(pos - j - 1) * ((pole * log(r_cross)) ** (j - pos))
+
             for p in other_single_poles:
                 denom *= pole - p
             for p in double_poles:
                 denom *= (pole - p) ** 2
-            ret += (one / denom) * (r_cross ** pole) * ((-pole) ** pos) * factorial(pos) * uppergamma(RealMPFR(str(-pos), prec), pole * log(r_cross))
+            ret += (one / denom) * ((-pole) ** pos) * gamma_val
 
         for i in range(0, len(double_poles)):
             denom = one
             pole = double_poles[i]
             other_double_poles = double_poles[:i] + double_poles[i + 1:]
+            gamma_val = ((-1) ** pos) * (r_cross ** pole) * double_gammas[i]
+            for j in range(0, pos):
+                gamma_val += ((-1) ** j) * factorial(pos - j - 1) * ((pole * log(r_cross)) ** (j - pos))
+
             for p in other_double_poles:
                 denom *= (pole - p) ** 2
             for p in single_poles:
                 denom *= pole - p
             # Contribution of the most divergent part
             ret += (one / (pole * denom)) * ((-1) ** (pos + 1)) * factorial(pos) * (log(r_cross) ** (-pos))
-            ret -= (one / denom) * (r_cross ** pole) * ((-pole) ** (pos - 1)) * factorial(pos) * uppergamma(RealMPFR(str(-pos), prec), pole * log(r_cross)) * (pos + pole * log(r_cross))
+            ret -= (one / denom) * ((-pole) ** (pos - 1)) * gamma_val * (pos + pole * log(r_cross))
 
             factor = 0
             for p in other_double_poles:
@@ -1034,9 +1051,9 @@ class SDP:
             for p in single_poles:
                 factor -= one / (pole - p)
             # Contribution of the least divergent part
-            ret += (factor / denom) * (r_cross ** pole) * ((-pole) ** pos) * factorial(pos) * uppergamma(RealMPFR(str(-pos), prec), pole * log(r_cross))
+            ret += (factor / denom) * ((-pole) ** pos) * gamma_val
 
-        return (r_cross ** shift) * ret
+        return ret
 
     def write_xml(self, obj, norm, name = "mySDP"):
         """
