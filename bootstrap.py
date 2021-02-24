@@ -888,21 +888,18 @@ class SDP:
 
         # Separate the poles and associate each with an uppergamma function
         # This avoids computing these same functions for each d in the loop below
-        single_poles = []
-        double_poles = []
-        single_gammas = []
-        double_gammas = []
         gathered_poles = gather(poles)
+        poles = []
+        orders = []
+        gammas = []
         for p in gathered_poles:
-            if gathered_poles[p] == 1 and p < delta_min:
-                single_poles.append(p - delta_min)
-                single_gammas.append(uppergamma(zero, (p - delta_min) * log(r_cross)))
-            elif p < delta_min:
-                double_poles.append(p - delta_min)
-                double_gammas.append(uppergamma(zero, (p - delta_min) * log(r_cross)))
+            if p < delta_min:
+                poles.append(p - delta_min)
+                orders.append(gathered_poles[p])
+                gammas.append(uppergamma(zero, (p - delta_min) * log(r_cross)))
 
         for d in range(0, 2 * (degree // 2) + 1):
-            result = (r_cross ** delta_min) * self.integral(d, single_poles, double_poles, single_gammas, double_gammas)
+            result = (r_cross ** delta_min) * self.integral(d, poles, orders, gammas)
             bands.append(result)
         for r in range(0, (degree // 2) + 1):
             new_entries = []
@@ -993,7 +990,29 @@ class SDP:
             product *= x - (p - shift)
         return (base ** (x + shift)) / product
 
-    def integral(self, pos, single_poles, double_poles, single_gammas, double_gammas):
+    def basic_integral(self, pos, pole, order, gamma_val):
+        """
+        Returns the inner product of two monic monomials with respect to a more
+        basic positive measure prefactor which has just a single pole.
+
+        Parameters
+        ----------
+        pos:       The sum of the degrees of the two monomials.
+        pole:      The root of the prefactor's denominator.
+        order:     The multiplicity of this root.
+        gamma_val: The associated incomplete gamma function. Note that it is no
+                   longer uppergamma(0, pole * log(r_cross)) because we are
+                   performing a change of variables.
+        """
+        if order == 1:
+            ret = exp(-pole) * (pole ** pos) * gamma_val
+            for i in range(0, pos):
+                ret += factorial(pos - i - 1) * (pole ** i)
+            return ret
+        else:
+            return (one / (order - 1)) * (pos * self.basic_integral(pos - 1, pole, order - 1, gamma_val) - self.basic_integral(pos, pole, order - 1, gamma_val))
+
+    def integral(self, pos, poles, orders, gammas):
         """
         Returns the inner product of two monic monomials with respect to the
         positive measure prefactor that turns a `PolynomialVector` into a rational
@@ -1001,57 +1020,45 @@ class SDP:
 
         Parameters
         ----------
-        pos:           The sum of the degrees of the two monomials.
-        single_poles:  The roots of the prefactor's denominator which appear
-                       linearly.
-        double_poles:  The roots of the prefactor's denominator which appear
-                       quadratically. This is where the pole order stops for a
-                       physical conformal block.
-        single_gammas: A list representing the image of `single_poles` under the
-                       map which sends x to uppergamma(0, x * log(r_cross)).
-        double_gammas: The same thing for the double poles.
+        pos:    The sum of the degrees of the two monomials.
+        poles:  A list of the roots of the prefactor's denominator.
+        orders: The multiplicities of those poles.
+        gammas: A list representing the image of `poles` under the map which sends
+                x to uppergamma(0, x * log(r_cross)).
         """
         ret = zero
-        if len(single_poles) == 0 and len(double_poles) == 0:
+        if len(poles) == 0:
             return factorial(pos) / ((-log(r_cross)) ** (pos + 1))
 
-        for i in range(0, len(single_poles)):
-            denom = one
-            pole = single_poles[i]
-            other_single_poles = single_poles[:i] + single_poles[i + 1:]
-            gamma_val = ((-1) ** pos) * (r_cross ** pole) * single_gammas[i]
-            for j in range(0, pos):
-                gamma_val += ((-1) ** j) * factorial(pos - j - 1) * ((pole * log(r_cross)) ** (j - pos))
-
-            for p in other_single_poles:
-                denom *= pole - p
-            for p in double_poles:
-                denom *= (pole - p) ** 2
-            ret += (one / denom) * ((-pole) ** pos) * gamma_val
-
-        for i in range(0, len(double_poles)):
-            denom = one
-            pole = double_poles[i]
-            other_double_poles = double_poles[:i] + double_poles[i + 1:]
-            gamma_val = ((-1) ** pos) * (r_cross ** pole) * double_gammas[i]
-            for j in range(0, pos):
-                gamma_val += ((-1) ** j) * factorial(pos - j - 1) * ((pole * log(r_cross)) ** (j - pos))
-
-            for p in other_double_poles:
-                denom *= (pole - p) ** 2
-            for p in single_poles:
-                denom *= pole - p
-            # Contribution of the most divergent part
-            ret += (one / (pole * denom)) * ((-1) ** (pos + 1)) * factorial(pos) * (log(r_cross) ** (-pos))
-            ret -= (one / denom) * ((-pole) ** (pos - 1)) * gamma_val * (pos + pole * log(r_cross))
-
-            factor = 0
-            for p in other_double_poles:
-                factor -= two / (pole - p)
-            for p in single_poles:
-                factor -= one / (pole - p)
-            # Contribution of the least divergent part
-            ret += (factor / denom) * ((-pole) ** pos) * gamma_val
+        for i in range(0, len(poles)):
+            pole = poles[i]
+            order = orders[i]
+            gamma_val = gammas[i]
+            other_poles = poles[:i] + poles[i + 1:]
+            other_orders = orders[:i] + orders[i + 1:]
+            exponents = {}
+            exponents[tuple(other_orders)] = 1
+            # For an order 3 pole, 0, 1 and 2 derivatives are needed in the Laurent series
+            for j in range(0, order):
+                for term in exponents:
+                    prod = factorial(j)
+                    for k in range(0, len(term)):
+                        prod *= (pole - other_poles[k]) ** term[k]
+                    ret += (one / prod) * exponents[term] * ((-log(r_cross)) ** (order - j - 1 - pos)) * self.basic_integral(pos, -pole * log(r_cross), order - j, gamma_val)
+                if j == order - 1:
+                    break
+                # Update exponents to move onto the next derivative
+                new_exponents = {}
+                for term in exponents:
+                    for k in range(0, len(term)):
+                        new_term = list(term)
+                        new_term[k] += 1
+                        new_term = tuple(new_term)
+                        if new_term in new_exponents:
+                            new_exponents[new_term] += -term[k] * exponents[term]
+                        else:
+                            new_exponents[new_term] = -term[k] * exponents[term]
+                exponents = new_exponents
 
         return ret
 
