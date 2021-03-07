@@ -248,6 +248,7 @@ class ConformalBlockTableSeed:
         res_list = []
         pow_list = []
         new_res_list = []
+        new_pow_list = []
 
         # Find out which residues we will ever need to include
         for l in range(0, l_max + k_max + 1):
@@ -276,14 +277,16 @@ class ConformalBlockTableSeed:
             res_list.append([])
             pow_list.append([])
             new_res_list.append([])
+            new_pow_list.append([])
 
         # Initialize the residues at the appropriate leading blocks
         for l in range(0, l_max + k_max + 1):
             for i in range(0, len(pol_list[l])):
                 l_new = pol_list[l][i][2]
                 res_list[l].append(MeromorphicBlockVector(leading_blocks[l_new]))
-
                 pow_list[l].append(0)
+
+                new_pow_list[l].append(pol_list[l][i][0])
                 new_res_list[l].append(0)
 
         for k in range(1, k_max + 1):
@@ -293,7 +296,7 @@ class ConformalBlockTableSeed:
                         continue
 
                     res = delta_residue(nu, pol_list[l][i][1], l, delta_12, delta_34, pol_list[l][i][3])
-                    pow_list[l][i] += pol_list[l][i][0]
+                    pow_list[l][i] = new_pow_list[l][i]
 
                     for j in range(0, len(res_list[l][i].chunks)):
                         r_sub = r_powers[pol_list[l][i][0]][0:derivative_order - j + 1, 0:derivative_order - j + 1]
@@ -304,15 +307,19 @@ class ConformalBlockTableSeed:
                     if pow_list[l][i] >= k_max:
                         continue
 
+                    new_pow = k_max
                     l_new = pol_list[l][i][2]
                     new_res_list[l][i] = MeromorphicBlockVector(leading_blocks[l_new])
                     pole1 = delta_pole(nu, pol_list[l][i][1], l, pol_list[l][i][3]) + pol_list[l][i][0]
 
                     for i_new in range(0, len(res_list[l_new])):
+                        new_pow = min(new_pow, pol_list[l_new][i_new][0])
                         pole2 = delta_pole(nu, pol_list[l_new][i_new][1], l_new, pol_list[l_new][i_new][3])
 
                         for j in range(0, len(new_res_list[l][i].chunks)):
                             new_res_list[l][i].chunks[j] = new_res_list[l][i].chunks[j].add_matrix(res_list[l_new][i_new].chunks[j].mul_scalar(1 / eval_mpfr(pole1 - pole2, prec)))
+
+                    new_pow_list[l][i] = pow_list[l][i] + new_pow
 
             for l in range(0, l_max + k_max + 1):
                 for i in range(0, len(res_list[l])):
