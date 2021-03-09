@@ -95,7 +95,6 @@ def get_index_approx(array, element, start = 0):
     Finds where an element numerically close to the one given occurs in an array
     or -1 if not present.
     """
-
     for i, v in itertools.islice(enumerate(array), start, None):
         if abs(v - element) < tiny:
             return i
