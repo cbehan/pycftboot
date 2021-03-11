@@ -1192,7 +1192,7 @@ class SDP:
 
             matrix = []
             if j >= len(self.bounds):
-                result = self.integral(0, delta_min, poles)
+                result = self.shifted_prefactor(poles, r_cross, points[0], zero)
                 result = one / sqrt(result)
                 matrix = DenseMatrix([[result]])
             else:
