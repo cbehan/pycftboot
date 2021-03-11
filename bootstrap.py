@@ -1010,7 +1010,7 @@ class SDP:
                 ret += factorial(pos - i - 1) * (pole ** i)
             return ret
         elif pos == 0:
-            return ((-pole) ** (1 - order) / (order - 1)) - (one / (order - 1)) * basic_integral(pos, pole, order - 1, gamma_val)
+            return ((-pole) ** (1 - order) / (order - 1)) - (one / (order - 1)) * self.basic_integral(pos, pole, order - 1, gamma_val)
         else:
             return (one / (order - 1)) * (pos * self.basic_integral(pos - 1, pole, order - 1, gamma_val) - self.basic_integral(pos, pole, order - 1, gamma_val))
 
