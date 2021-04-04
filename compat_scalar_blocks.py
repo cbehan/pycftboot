@@ -50,12 +50,14 @@ def scalar_blocks_read(block_table, name):
 
     block_table.table = []
     for f in files:
+        sign = 1
         remove_zero = 0
         info = f.replace('--', '-')
         full = name + "/" + f
         l = int(info.split('-')[6][1:])
         if l % 2 == 1:
             block_table.odd_spins = True
+            sign = -1
         if l > block_table.l_max:
             block_table.l_max = l
 
@@ -74,7 +76,7 @@ def scalar_blocks_read(block_table, name):
                     coeff = poly_lines[k].split('->')[1]
                 else:
                     coeff = poly_lines[k].split('*')[0][5:]
-                poly += RealMPFR(coeff, prec) * (delta ** k)
+                poly += sign * RealMPFR(coeff, prec) * (delta ** k)
             # It turns out that the scalars come with a shift of d - 2 which is not the unitarity bound
             # All shifts, scalar or not, are undone here as we prefer to handle this step during XML writing
             derivatives.append(poly.subs(delta, delta - block_table.dim - l + 2).expand())
