@@ -426,9 +426,9 @@ class ConvolvedBlockTable:
                 if l + ell_shift >= 0:
                     gathered_poles = gather(block_table.table[l + ell_shift].poles)
                     for p in gathered_poles.keys():
-                        ind = get_index_approx(pole_dict.keys(), p)
+                        ind = get_index_approx(pole_dict.keys(), p - del_shift)
                         if ind == -1:
-                            pole_dict[p] = gathered_poles[p]
+                            pole_dict[p - del_shift] = gathered_poles[p]
                         else:
                             pole_dict_index = index_iter(pole_dict.keys(), ind)
                             num = pole_dict[pole_dict_index]
