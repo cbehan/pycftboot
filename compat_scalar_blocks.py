@@ -35,7 +35,7 @@ def scalar_blocks_read(block_table, name):
         block_table.delta_34 = float(delta34_positive[1].split('-')[0])
 
     info = info.split('-')
-    block_table.dim = float(info[1][1:])
+    block_table.dim = RealMPFR(info[1][1:], prec)
     block_table.k_max = int(info[8][13:])
     block_table.n_max = int(info[7][4:]) - 1
     block_table.m_max = 1
