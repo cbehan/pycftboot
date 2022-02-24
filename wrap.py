@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python
 """
 This concatenates all of the PyCFTBoot files. The idea is to need only one command
 to send it to a cluster.

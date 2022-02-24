@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python
 """
 PyCFTBoot is an interface for the numerical bootstrap in arbitrary dimension,
 a field that was initiated in 2008 by Rattazzi, Rychkov, Tonni and Vichi in

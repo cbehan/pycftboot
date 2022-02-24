@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python
 """
 This is a tutorial that applies conformal bootstrap logic with PyCFTBoot to make
 non-trivial statements about four different conformal field theories. These are
