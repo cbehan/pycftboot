@@ -16,6 +16,8 @@ from __future__ import print_function
 import xml.dom.minidom
 import subprocess
 import itertools
+import zipfile
+import json
 import time
 import re
 import os
@@ -1064,30 +1066,21 @@ class SDP:
 
         return ret
 
-    def write_xml(self, obj, norm, name = "mySDP"):
+    def table_extension(self, points):
         """
-        Outputs an XML file describing the `table`, `bounds`, `points` and `basis`
-        for this `SDP` in a format that `SDPB` can use to check for solvability.
-        If the user has the Elemental version of `SDPB` then the `pvm2sdb` utility
-        (assumed to be in the same directory) is also run.
+        Returns a list of matrices of `PolynomialVector's which should be appended
+        to `table' to directly before the SDP is written. The caller is responsible
+        for shortening `table' again afterwards. There should be no need to call
+        this directly.
 
         Parameters
         ----------
-        obj:  Objective vector (often the `vector` part of a `PolynomialVector`)
-              whose action under the found functional should be maximized.
-        norm: Normalization vector (often the `vector` part of a `PolynomialVector`)
-              which should have unit action under the functionals.
-        name: [Optional] Name of the XML file to produce without any ".xml" at the
-              end. Defaults to "mySDP".
+        points: A list of points discretely added to the SDP in the format prepared
+                by `add_point' (often the `points' attribute itself).
         """
-        obj = self.reshuffle_with_normalization(obj, norm)
-        laguerre_points = []
-        laguerre_degrees = []
         extra_vectors = []
-        degree_sum = 0
 
-        # Handle discretely added points
-        for p in self.points:
+        for p in points:
             l = self.get_table_index(p[0])
             size = len(self.table[l])
 
@@ -1112,7 +1105,152 @@ class SDP:
                     inner_list.append(PolynomialVector(new_vector, p[0], self.table[l][r][s].poles))
                 outer_list.append(inner_list)
             extra_vectors.append(outer_list)
-        self.table += extra_vectors
+
+        return extra_vectors
+
+    def write_zip(self, obj, norm, name = "mySDP"):
+        """
+        Outputs a PKZIP archive containing JSON files which describe the `table',
+        `bounds', `points' and `basis' for this SDP to be read by the Elemental
+        version of SDPB. The result should be equivalent to calling `write_xml' and
+        then `pvm2sdp'.
+
+        Parameters
+        ----------
+        obj:  Objective vector (often the `vector` part of a `PolynomialVector`)
+              whose action under the found functional should be maximized.
+        norm: Normalization vector (often the `vector` part of a `PolynomialVector`)
+              which should have unit action under the functionals.
+        name: [Optional] Name of the PKZIP file to produce. If a ".zip" extension
+              is desired, the user needs to add it. Defaults to "mySDP".
+        """
+        doc = zipfile.ZipFile(name, mode = 'x')
+        obj = self.reshuffle_with_normalization(obj, norm)
+        self.table += self.table_extension(self.points)
+        laguerre_points = []
+        laguerre_degrees = []
+        degree_sum = 0
+
+        control_dict = {"num_blocks": len(self.table) - self.bounds.count(oo), "command": "python"}
+        control_str = json.dumps(control_dict, indent = 2)
+        doc.writestr("control.json", control_str)
+
+        # Here, we use indices that match the SDPB specification
+        objectives_dict = {"constant": self.short_string(obj[0]), "b": []}
+        for n in range(1, len(obj)):
+            objectives_dict["b"].append(self.short_string(obj[n]))
+        objectives_str = json.dumps(objectives_dict, indent = 2)
+        doc.writestr("objectives.json", objectives_str)
+
+        current_block = -1
+        for j in range(0, len(self.table)):
+            if j >= len(self.bounds):
+                delta_min = 0
+            else:
+                delta_min = self.bounds[j]
+            if delta_min == oo:
+                continue
+            else:
+                current_block += 1
+            size = len(self.table[j])
+            degree = 0
+
+            # A first pass is needed to get the maximum degree
+            for r in range(0, size):
+                for s in range(0, size):
+                    polynomial_vector = self.table[j][r][s].vector
+
+                    for n in range(0, len(polynomial_vector)):
+                        coeff_list = coefficients(polynomial_vector[n].expand())
+                        degree = max(degree, len(coeff_list) - 1)
+
+            block_dict = {"dim": size, "num_points": degree + 1, "bilinear_bases_even": [], "bilinear_bases_odd": [], "c": [], "B": []}
+            poles = self.table[j][0][0].poles
+            index = get_index(laguerre_degrees, degree)
+            degree_sum += degree + 1
+
+            if j >= len(self.bounds):
+                points = [self.points[j - len(self.bounds)][1]]
+            elif index == -1:
+                points = self.make_laguerre_points(degree)
+                laguerre_points.append(points)
+                laguerre_degrees.append(degree)
+            else:
+                points = laguerre_points[index]
+
+            scalings = []
+            for d in range(0, degree + 1):
+                scalings.append(self.shifted_prefactor(poles, r_cross, points[d], eval_mpfr(delta_min, prec)))
+
+            matrix = []
+            if j >= len(self.bounds):
+                result = self.shifted_prefactor(poles, r_cross, points[0], zero)
+                result = one / sqrt(result)
+                matrix = DenseMatrix([[result]])
+            else:
+                matrix = self.basis[j]
+
+            for n in range(0, (degree // 2) + 1):
+                expression = build_polynomial(list(matrix.row(n)))
+
+                even_parts = []
+                odd_parts = []
+                for d in range(0, degree + 1):
+                    even_parts.append(sqrt(scalings[d]) * expression.subs(delta, points[d]))
+                    odd_parts.append(sqrt(points[d]) * even_parts[-1])
+                    even_parts[-1] = str(even_parts[-1])
+                    odd_parts[-1] = str(odd_parts[-1])
+                block_dict["bilinear_bases_even"].append(even_parts)
+                if degree % 2 == 0 and n == degree // 2:
+                    break
+                block_dict["bilinear_bases_odd"].append(odd_parts)
+
+            # Now we can evaluate everything at the points above
+            for r in range(0, size):
+                for s in range(0, size):
+                    polynomial_vector = self.reshuffle_with_normalization(self.table[j][r][s].vector, norm)
+
+                    for d in range(0, degree + 1):
+                        first = polynomial_vector[0].subs(delta, eval_mpfr(delta_min, prec) + points[d])
+                        block_dict["c"].append(str(scalings[d] * first))
+
+                        rest = []
+                        for n in range(1, len(polynomial_vector)):
+                            expression = polynomial_vector[n].subs(delta, eval_mpfr(delta_min, prec) + points[d])
+                            rest.append(str(-scalings[d] * expression))
+                        block_dict["B"].append(rest)
+
+            block_str = json.dumps(block_dict, indent = 2)
+            doc.writestr("block_" + str(current_block) + ".json", block_str)
+
+        # Recognize an SDP that looks overdetermined
+        if degree_sum < len(self.unit):
+            print("Crossing equations have too many derivative components")
+
+        self.table = self.table[:len(self.bounds)]
+        doc.close()
+
+    def write_xml(self, obj, norm, name = "mySDP"):
+        """
+        Outputs an XML file describing the `table`, `bounds`, `points` and `basis`
+        for this `SDP` in a format that `SDPB` can use to check for solvability.
+        If the user has the Elemental version of `SDPB` then the `pvm2sdb` utility
+        (assumed to be in the same directory) is also run.
+
+        Parameters
+        ----------
+        obj:  Objective vector (often the `vector` part of a `PolynomialVector`)
+              whose action under the found functional should be maximized.
+        norm: Normalization vector (often the `vector` part of a `PolynomialVector`)
+              which should have unit action under the functionals.
+        name: [Optional] Name of the XML file to produce without any ".xml" at the
+              end. Defaults to "mySDP".
+        """
+        obj = self.reshuffle_with_normalization(obj, norm)
+        self.table += self.table_extension(self.points)
+        laguerre_points = []
+        laguerre_degrees = []
+        degree_sum = 0
 
         doc = xml.dom.minidom.Document()
         root_node = doc.createElement("sdp")
@@ -1185,7 +1323,7 @@ class SDP:
                 elt_node = doc.createElement("elt")
                 elt_node.appendChild(doc.createTextNode(points[d].__str__()))
                 sample_point_node.appendChild(elt_node)
-                damped_rational = self.shifted_prefactor(poles, r_cross, points[d], RealMPFR(str(delta_min), prec))
+                damped_rational = self.shifted_prefactor(poles, r_cross, points[d], eval_mpfr(delta_min, prec))
                 elt_node = doc.createElement("elt")
                 elt_node.appendChild(doc.createTextNode(damped_rational.__str__()))
                 sample_scaling_node.appendChild(elt_node)
