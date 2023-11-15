@@ -34,6 +34,7 @@ if have_mpfr == False:
 # Relocate some self-contained classes to separate files
 # Importing them would not make sense because they refer back to things in this file
 exec(open("common.py").read())
+exec(open("compat_autoboot.py").read())
 exec(open("compat_juliboots.py").read())
 exec(open("compat_scalar_blocks.py").read())
 exec(open("blocks1.py").read())
