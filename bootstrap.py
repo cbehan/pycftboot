@@ -153,7 +153,7 @@ class ConformalBlockTable:
                         juliboots_read(self, name)
                 return
             except:
-                print("Table " + name + " not present, generating another")
+                print("Table " + name + " not present, generating another", flush = True)
 
         if type(dim) == type(1) and dim % 2 == 0:
             small_table = ConformalBlockTableSeed2(dim, k_max, l_max, min(m_max + 2 * n_max, 3), delta_12, delta_34, odd_spins)
@@ -842,7 +842,7 @@ class SDP:
             elif found == False and value != None:
                 self.options.append(opt_string + str(value))
         else:
-            print("Unknown option")
+            print("Unknown option", flush = True)
 
     def get_table_index(self, spin_irrep):
         """
@@ -1226,7 +1226,7 @@ class SDP:
 
         # Recognize an SDP that looks overdetermined
         if degree_sum < len(self.unit):
-            print("Crossing equations have too many derivative components")
+            print("Crossing equations have too many derivative components", flush = True)
 
         self.table = self.table[:len(self.bounds)]
         doc.close()
@@ -1356,7 +1356,7 @@ class SDP:
 
         # Recognize an SDP that looks overdetermined
         if degree_sum < len(self.unit):
-            print("Crossing equations have too many derivative components")
+            print("Crossing equations have too many derivative components", flush = True)
 
         self.table = self.table[:len(self.bounds)]
         xml_file = open(name + ".xml", 'w')
@@ -1483,7 +1483,7 @@ class SDP:
                 bias_found = True
 
             test = lower + x * (upper - lower)
-            print("Trying " + test.__str__())
+            print("Trying " + test.__str__(), flush = True)
             if isolated == True:
                 self.add_point(spin_irrep, test)
             else:
