@@ -1395,7 +1395,7 @@ class SDP:
             value = value.replace(';', '')
             value = value.replace('{', '[')
             value = value.replace('}', ']')
-            value = re.sub("([0-9]+\.[0-9]+e?-?[0-9]+)", r"RealMPFR('\1', prec)", value)
+            value = re.sub(r"([0-9]+\.[0-9]+e?-?[0-9]+)", r"RealMPFR('\1', prec)", value)
             command = "ret['" + key.strip() + "'] = " + value
             exec(command)
         out_file.close()
@@ -1406,7 +1406,7 @@ class SDP:
             lines = outfile.readlines()
             for i in range(1, len(lines)):
                 value = lines[i].replace('\n', '')
-                value = re.sub("([0-9]+\.[0-9]+e?-?[0-9]+)", r"RealMPFR('\1', prec)", value)
+                value = re.sub(r"([0-9]+\.[0-9]+e?-?[0-9]+)", r"RealMPFR('\1', prec)", value)
                 exec("y.append(" + value + ")")
             outfile.close()
             ret["y"] = y
@@ -1689,7 +1689,7 @@ class SDP:
             out_file.write(str(j) + " -> ")
             line = next(in_file)[:-2].split("->")[1]
             line = line.replace('{', '[').replace('}', ']')
-            line = re.sub("([0-9]+\.[0-9]+e?-?[0-9]+)", r"RealMPFR('\1', prec)", line)
+            line = re.sub(r"([0-9]+\.[0-9]+e?-?[0-9]+)", r"RealMPFR('\1', prec)", line)
             exec("ops = " + line)
             for o in range(0, len(ops)):
                 ops[o][0] = ops[o][0] + shift

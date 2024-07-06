@@ -67,7 +67,7 @@ def scalar_blocks_read(block_table, name):
             print("Please rerun scalar_blocks with --output-poles")
             return
         vector = vector_with_poles[0].replace('{', '').replace('}', '')
-        vector = re.sub("abDeriv\[[0-9]+,[0-9]+\]", "", vector).split(',\n')[:-1]
+        vector = re.sub(r"abDeriv\[[0-9]+,[0-9]+\]", "", vector).split(',\n')[:-1]
         for el in vector:
             poly = 0
             poly_lines = el.split('\n')

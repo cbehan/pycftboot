@@ -240,7 +240,7 @@ def dump_table_contents(block_table, name):
         dump_file.write("derivatives = []\n")
         for i in range(0, len(block_table.table[0].vector)):
             poly_string = block_table.table[l].vector[i].__str__()
-            poly_string = re.sub("([0-9]+\.[0-9]+e?-?[0-9]+)", r"RealMPFR('\1', prec)", poly_string)
+            poly_string = re.sub(r"([0-9]+\.[0-9]+e?-?[0-9]+)", r"RealMPFR('\1', prec)", poly_string)
             dump_file.write("derivatives.append(" + poly_string + ")\n")
         dump_file.write("self.table.append(PolynomialVector(derivatives, " + block_table.table[l].label.__str__() + ", " + block_table.table[l].poles.__str__() + "))\n")
 

@@ -82,7 +82,7 @@ def autoboot_sdp(dim, k_max, l_max, m_max, n_max, operators, equations):
     for eq in eq_list:
         data = eq[:]
         while ope_symbol in data:
-            m = re.search('\]\[[0-9]*\]\^2, |\]\[[0-9]*\], ', data)
+            m = re.search(r'\]\[[0-9]*\]\^2, |\]\[[0-9]*\], ', data)
             pos0 = m.start()
             pos1 = m.end()
             pos2 = data.index("]]", pos1)
@@ -142,7 +142,7 @@ def autoboot_sdp(dim, k_max, l_max, m_max, n_max, operators, equations):
                         coeff = eq_list[l][:pos0].replace('*', '').replace(' ', '')
                     else:
                         data = eq_list[l][ind:0:-1]
-                        m = re.search("mus[*]?[0-9]* [\+|\-]", data)
+                        m = re.search(r"mus[*]?[0-9]* [\+|\-]", data)
                         coeff = m.group()[-1:3:-1]
                         coeff = coeff.replace('*', '').replace(' ', '')
                     if '/' in coeff:
