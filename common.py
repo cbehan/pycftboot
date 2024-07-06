@@ -31,27 +31,42 @@ def find_executable(name):
 if not os.path.isfile(sdpb_path):
     sdpb_path = find_executable("sdpb")
 
-# Determine (major) version of SDPB
+# Determine major and minor version of SDPB
 proc = subprocess.Popen([sdpb_path, "--version"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 (stdout, _) = proc.communicate()
 if proc.returncode != 0:
     # Assume that this is version 1.x, which didn't support --version
-    sdpb_version = 1
+    sdpb_version_major = 1
+    sdpb_version_minor = 0
 else:
     # Otherwise parse the output of --version
-    m = re.search(r"SDPB ([0-9])", str(stdout))
+    m = re.search(r"SDPB ([0-9]).([0-9])", str(stdout))
     if m is None:
         raise RuntimeError("Failed to retrieve SDPB version.")
-    sdpb_version = int(m.group(1))
+    sdpb_version_major = int(m.group(1))
+    sdpb_version_minor = int(m.group(2))
 
 sdpb_options = ["checkpointInterval", "maxIterations", "maxRuntime", "dualityGapThreshold", "primalErrorThreshold", "dualErrorThreshold", "initialMatrixScalePrimal", "initialMatrixScaleDual", "feasibleCenteringParameter", "infeasibleCenteringParameter", "stepLengthReduction", "maxComplementarity"]
 sdpb_defaults = ["3600", "500", "86400", "1e-30", "1e-30", "1e-30", "1e+20", "1e+20", "0.1", "0.3", "0.7", "1e+100"]
-if sdpb_version == 1:
+if sdpb_version_major == 1:
     sdpb_options = ["maxThreads", "choleskyStabilizeThreshold"] + sdpb_options
     sdpb_defaults = ["4", "1e-40"] + sdpb_defaults
-else:
-    sdpb_options = ["procsPerNode", "procGranularity", "verbosity"] + sdpb_options
-    sdpb_defaults = ["0", "1", "1"] + sdpb_defaults
+if sdpb_version_minor > 1:
+    sdpb_options = ["verbosity"] + sdpb_options
+    sdpb_defaults = ["1"] + sdpb_defaults
+if sdpb_version_major == 2 and 0 <= sdpb_version_minor <= 6:
+    sdpb_options = ["procsPerNode"] + sdpb_options
+    sdpb_defaults = ["0"] + sdpb_defaults
+if sdpb_version_major == 2 and 1 <= sdpb_version_minor <= 7:
+    sdpb_options = ["procGranularity"] + sdpb_options
+    sdpb_defaults = ["1"] + sdpb_defaults
+if sdpb_version_major > 2 or (sdpb_version_major == 2 and sdpb_version_minor >= 5):
+    sdpb_options = ["minPrimalStep", "minDualStep"] + sdpb_options
+    sdpb_defaults = ["0", "0"] + sdpb_defaults
+if sdpb_version_major > 2:
+    sdpb_options = ["maxSharedMemory"] + sdpb_options
+    sdpb_defaults = ["0"] + sdpb_defaults
+if sdpb_version_major > 1:
     if not os.path.isfile(mpirun_path):
         mpirun_path = find_executable("mpirun")
 

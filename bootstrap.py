@@ -14,6 +14,7 @@ dimensions and transform in arbitrary representations of a global symmetry.
 """
 from __future__ import print_function
 import xml.dom.minidom
+import multiprocessing
 import subprocess
 import itertools
 import zipfile
@@ -1364,9 +1365,14 @@ class SDP:
         xml_file.close()
         doc.unlink()
 
-        if sdpb_version == 2:
+        if sdpb_version_major == 1:
+            return
+        elif sdpb_version_major == 2 and sdpb_version_minor <= 6:
             pvm2sdp_path = os.path.dirname(sdpb_path) + "/pvm2sdp"
             subprocess.check_call([mpirun_path, "-n", "1", pvm2sdp_path, str(prec), name + ".xml", name])
+        else:
+            pmp2sdp_path = os.path.dirname(sdpb_path) + "/pmp2sdp"
+            subprocess.check_call([mpirun_path, "-n", "1", pmp2sdp_path, "-i", name + ".xml", "-o", name, "-p", str(prec)])
 
     def read_output(self, name = "mySDP"):
         """
@@ -1379,7 +1385,7 @@ class SDP:
                     Defaults to "mySDP".
         """
         ret = {}
-        if sdpb_version == 1:
+        if sdpb_version_major == 1:
             out_file = open(name + ".out", 'r')
         else:
             out_file = open(name + "_out/out.txt", 'r')
@@ -1394,7 +1400,7 @@ class SDP:
             exec(command)
         out_file.close()
 
-        if sdpb_version == 2:
+        if sdpb_version_major > 1:
             y = []
             outfile = open(name + "_out/y.txt", 'r')
             lines = outfile.readlines()
@@ -1419,12 +1425,15 @@ class SDP:
         obj = [0.0] * len(self.table[0][0][0].vector)
         self.write_xml(obj, self.unit, name)
 
-        if sdpb_version == 1:
+        if sdpb_version_major == 1:
             subprocess.check_call([sdpb_path, "-s", name + ".xml", "--precision=" + str(prec), "--findPrimalFeasible", "--findDualFeasible", "--noFinalCheckpoint"] + self.options)
-        else:
+        elif sdpb_version_major == 2 and 0 <= sdpb_version_minor <= 6:
             ppn = self.get_option("procsPerNode")
             ppn = str(max(1, int(ppn)))
             self.set_option("procsPerNode", ppn)
+            subprocess.check_call([mpirun_path, "-n", ppn, sdpb_path, "-s", name, "--precision=" + str(prec), "--findPrimalFeasible", "--findDualFeasible"] + self.options)
+        else:
+            ppn = str(multiprocessing.cpu_count() // 2)
             subprocess.check_call([mpirun_path, "-n", ppn, sdpb_path, "-s", name, "--precision=" + str(prec), "--findPrimalFeasible", "--findDualFeasible"] + self.options)
         output = self.read_output(name = name)
 
@@ -1491,7 +1500,7 @@ class SDP:
 
             # Using the same name twice in a row is only dangerous if the runs are really long
             start = time.time()
-            if checkpoints and sdpb_version == 1:
+            if checkpoints and sdpb_version_major == 1:
                 result = self.iterate(name = str(start))
             else:
                 result = self.iterate(name = name)
@@ -1634,12 +1643,15 @@ class SDP:
         self.write_xml(obj, norm, name)
         self.set_bound(spin_irrep, old)
 
-        if sdpb_version == 1:
+        if sdpb_version_major == 1:
             subprocess.check_call([sdpb_path, "-s", name + ".xml", "--precision=" + str(prec), "--noFinalCheckpoint"] + self.options)
-        else:
+        elif sdpb_version_major == 2 and 0 <= sdpb_version_minor <= 6:
             ppn = self.get_option("procsPerNode")
             ppn = str(max(1, int(ppn)))
             self.set_option("procsPerNode", ppn)
+            subprocess.check_call([mpirun_path, "-n", ppn, sdpb_path, "-s", name, "--precision=" + str(prec), "--noFinalCheckpoint"] + self.options)
+        else:
+            ppn = str(multiprocessing.cpu_count() // 2)
             subprocess.check_call([mpirun_path, "-n", ppn, sdpb_path, "-s", name, "--precision=" + str(prec), "--noFinalCheckpoint"] + self.options)
         output = self.read_output(name = name)
         return [one] + output["y"]
@@ -2025,7 +2037,7 @@ class SDP:
         aux_sdp.write_xml(obj, norm, name = "tmp")
 
         # SDPB should now run quickly with default options
-        if sdpb_version == 1:
+        if sdpb_version_major == 1:
             subprocess.check_call([sdpb_path, "-s", "tmp.xml", "--noFinalCheckpoint"])
         else:
             subprocess.check_call([mpirun_path, "-n", "1", sdpb_path, "-s", "tmp.xml", "--noFinalCheckpoint"])
