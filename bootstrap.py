@@ -1369,10 +1369,10 @@ class SDP:
             return
         elif sdpb_version_major == 2 and sdpb_version_minor <= 6:
             pvm2sdp_path = os.path.dirname(sdpb_path) + "/pvm2sdp"
-            subprocess.check_call([mpirun_path, "-n", "1", pvm2sdp_path, str(prec), name + ".xml", name])
+            subprocess.check_call([mpirun_path, "-n", "1", pvm2sdp_path, "json", str(prec), name + ".xml", name])
         else:
             pmp2sdp_path = os.path.dirname(sdpb_path) + "/pmp2sdp"
-            subprocess.check_call([mpirun_path, "-n", "1", pmp2sdp_path, "-i", name + ".xml", "-o", name, "-p", str(prec)])
+            subprocess.check_call([mpirun_path, "-n", "1", pmp2sdp_path, "-f", "json", "-i", name + ".xml", "-o", name, "-p", str(prec)])
 
     def read_output(self, name = "mySDP"):
         """
