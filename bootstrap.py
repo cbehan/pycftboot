@@ -1126,7 +1126,7 @@ class SDP:
         name: [Optional] Name of the PKZIP file to produce. If a ".zip" extension
               is desired, the user needs to add it. Defaults to "mySDP".
         """
-        doc = zipfile.ZipFile(name, mode = 'x')
+        doc = zipfile.ZipFile(name, mode = 'w')
         obj = self.reshuffle_with_normalization(obj, norm)
         self.table += self.table_extension(self.points)
         laguerre_points = []
@@ -1166,7 +1166,8 @@ class SDP:
                         coeff_list = coefficients(polynomial_vector[n].expand())
                         degree = max(degree, len(coeff_list) - 1)
 
-            block_dict = {"dim": size, "num_points": degree + 1, "bilinear_bases_even": [], "bilinear_bases_odd": [], "c": [], "B": []}
+            block_info_dict = {"dim": size, "num_points": degree + 1}
+            block_data_dict = {"bilinear_bases_even": [], "bilinear_bases_odd": [], "c": [], "B": []}
             poles = self.table[j][0][0].poles
             index = get_index(laguerre_degrees, degree)
             degree_sum += degree + 1
@@ -1202,10 +1203,10 @@ class SDP:
                     odd_parts.append(sqrt(points[d]) * even_parts[-1])
                     even_parts[-1] = str(even_parts[-1])
                     odd_parts[-1] = str(odd_parts[-1])
-                block_dict["bilinear_bases_even"].append(even_parts)
+                block_data_dict["bilinear_bases_even"].append(even_parts)
                 if degree % 2 == 0 and n == degree // 2:
                     break
-                block_dict["bilinear_bases_odd"].append(odd_parts)
+                block_data_dict["bilinear_bases_odd"].append(odd_parts)
 
             # Now we can evaluate everything at the points above
             for r in range(0, size):
@@ -1214,16 +1215,25 @@ class SDP:
 
                     for d in range(0, degree + 1):
                         first = polynomial_vector[0].subs(delta, eval_mpfr(delta_min, prec) + points[d])
-                        block_dict["c"].append(str(scalings[d] * first))
+                        block_data_dict["c"].append(str(scalings[d] * first))
 
                         rest = []
                         for n in range(1, len(polynomial_vector)):
                             expression = polynomial_vector[n].subs(delta, eval_mpfr(delta_min, prec) + points[d])
                             rest.append(str(-scalings[d] * expression))
-                        block_dict["B"].append(rest)
+                        block_data_dict["B"].append(rest)
 
-            block_str = json.dumps(block_dict, indent = 2)
-            doc.writestr("block_" + str(current_block) + ".json", block_str)
+            if sdpb_version_major == 2 and sdpb_version_minor <= 5:
+                block_dict = {}
+                block_dict.update(block_info_dict)
+                block_dict.update(block_data_dict)
+                block_str = json.dumps(block_dict, indent = 2)
+                doc.writestr("block_" + str(current_block) + ".json", block_str)
+            else:
+                block_info_str = json.dumps(block_info_dict, indent = 2)
+                block_data_str = json.dumps(block_data_dict, indent = 2)
+                doc.writestr("block_info_" + str(current_block) + ".json", block_info_str)
+                doc.writestr("block_data_" + str(current_block) + ".json", block_data_str)
 
         # Recognize an SDP that looks overdetermined
         if degree_sum < len(self.unit):
