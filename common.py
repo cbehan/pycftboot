@@ -216,7 +216,7 @@ def omit_all(poles, special_poles, var, shift = 0):
         expression *= (var - p) ** (gathered1[p] - power)
     return expression
 
-def dump_table_contents(block_table, name):
+def dump_table_contents(block_table, name, delta_ext_sub = 0):
     """
     This is called by `ConformalBlockTable` and `ConformalBlockTableSeed`. It
     writes executable Python code to a file designed to recreate the full set of
@@ -239,7 +239,7 @@ def dump_table_contents(block_table, name):
     for l in range(0, len(block_table.table)):
         dump_file.write("derivatives = []\n")
         for i in range(0, len(block_table.table[0].vector)):
-            poly_string = block_table.table[l].vector[i].__str__()
+            poly_string = block_table.table[l].vector[i].subs(delta_ext, delta_ext_sub).expand().__str__()
             poly_string = re.sub(r"([0-9]+\.[0-9]+e?-?[0-9]+)", r"RealMPFR('\1', prec)", poly_string)
             dump_file.write("derivatives.append(" + poly_string + ")\n")
         dump_file.write("self.table.append(PolynomialVector(derivatives, " + block_table.table[l].label.__str__() + ", " + block_table.table[l].poles.__str__() + "))\n")
